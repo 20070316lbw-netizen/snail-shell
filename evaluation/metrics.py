@@ -67,8 +67,8 @@ def winkler_score(
     width = upper - lower
 
     # 惩罚项
-    penalty_lower = np.where(y_true < lower, (1 / alpha) * (lower - y_true), 0)
-    penalty_upper = np.where(y_true > upper, (1 / alpha) * (y_true - upper), 0)
+    penalty_lower = np.where(y_true < lower, (2 / alpha) * (lower - y_true), 0)
+    penalty_upper = np.where(y_true > upper, (2 / alpha) * (y_true - upper), 0)
 
     # 总分
     winkler = width + penalty_lower + penalty_upper

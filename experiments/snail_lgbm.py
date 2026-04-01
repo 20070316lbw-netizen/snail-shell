@@ -158,6 +158,8 @@ def run_snail_experiment(
     X_test: np.ndarray,
     y_test: np.ndarray,
     beta_values: Optional[List[float]] = None,
+    X_val_q2_4: Optional[np.ndarray] = None,
+    y_val_q2_4: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     运行蜗牛壳实验
@@ -194,13 +196,25 @@ def run_snail_experiment(
 
         # 存储结果
         method_name = f"Snail-{beta}"
-        results[method_name] = {
+        result_dict = {
             "point_pred": point_pred,
             "lower": lower,
             "upper": upper,
             "interval": (lower, upper),
             "diagnostics": predictions["diagnostics"],
         }
+
+        if X_val_q2_4 is not None and y_val_q2_4 is not None:
+            v_predictions = model.predict(X_val_q2_4)
+            result_dict["val_q2_4"] = {
+                "point_pred": v_predictions["corrected_point"],
+                "lower": v_predictions["q10"],
+                "upper": v_predictions["q90"],
+                "interval": (v_predictions["q10"], v_predictions["q90"]),
+                "diagnostics": v_predictions["diagnostics"],
+            }
+
+        results[method_name] = result_dict
 
     return results
 

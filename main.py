@@ -85,14 +85,25 @@ def load_data(ctx):
         ]
         label_col = "label_next_month"
 
+        df = loader.get_features()
+
+        # Apply Rolling z-score Normalization by ticker
+        # W=60, min_periods=1 for expanding window in first 60 days
+        def zscore_normalize(group):
+            roll = group[feature_cols].rolling(window=60, min_periods=1)
+            mu = roll.mean()
+            sigma = roll.std()
+            group[feature_cols] = (group[feature_cols] - mu) / (sigma + 1e-8)
+            return group
+
+        df = df.groupby('ticker', group_keys=False).apply(zscore_normalize)
+
         def _slice(df, s, e):
             mask = (df["date"] >= s) & (df["date"] <= e)
             sub = df[mask].copy()
             X = sub[feature_cols].values.astype(np.float32)
             y = sub[label_col].values.astype(np.float32)
             return X, y
-
-        df = loader.get_features()
         if df.empty:
             raise RuntimeError("features_cn 表为空，请先向数据库中写入数据。")
 
@@ -162,7 +173,7 @@ def cmd_compare(args, ctx):
     # ── 基线实验 ────────────────────────────────────────────────
     print("\n📊 运行基线实验 ...")
     baseline_results = ctx["run_baseline_experiment"](
-        Xtr, ytr, Xvq1, yvq1, Xte, yte
+        Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv
     )
     all_preds.update(baseline_results)
 
@@ -170,14 +181,52 @@ def cmd_compare(args, ctx):
     betas = args.betas if args.betas else [0.5, 1.0, 2.0, 5.0]
     print(f"\n🐌 运行蜗牛壳变体 β={betas} ...")
     snail_results = ctx["run_snail_experiment"](
-        Xtr, ytr, Xv, yv, Xte, yte, beta_values=betas
+        Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
     )
     all_preds.update(snail_results)
 
-    # ── 汇总评估 ────────────────────────────────────────────────
-    print("\n📈 评估指标汇总：")
+    # ── 汇总评估 (Test Set) ────────────────────────────────────────────────
+    print("\n📈 测试集评估指标汇总：")
     df_eval = ctx["evaluate_methods"](yte, all_preds)
     _print_results_table(df_eval)
+
+    # ── 汇总评估 (Val Q2-Q4) ─────────────────────────────────────────────
+    print("\n📈 验证集 Q2-Q4 评估指标汇总 (Regime Shift密集区)：")
+    val_q2_4_preds = {}
+    for method, preds in all_preds.items():
+        if "val_q2_4" in preds:
+            val_q2_4_preds[method] = preds["val_q2_4"]
+    if val_q2_4_preds:
+        df_eval_val = ctx["evaluate_methods"](yv, val_q2_4_preds)
+        _print_results_table(df_eval_val)
+
+    # ── 统计显著性检验 ────────────────────────────────────────────────────
+    print("\n🔬 统计显著性检验 (Test Set Winkler Score: Snail-1.0 vs CP)：")
+    if "Snail-1.0" in all_preds and "CP" in all_preds:
+        # Calculate individual Winkler Scores for Snail-1.0 and CP on Test Set
+        from evaluation.metrics import paired_t_test
+        import numpy as np
+
+        # we need to calculate winkler score per sample to do t-test
+        from config import EVALUATION_PARAMS
+        alpha = EVALUATION_PARAMS.get("winkler_alpha", 0.2)
+
+        def _get_winkler_array(y, lower, upper, alpha=alpha):
+            width = upper - lower
+            penalty_lower = np.where(y < lower, (2 / alpha) * (lower - y), 0)
+            penalty_upper = np.where(y > upper, (2 / alpha) * (y - upper), 0)
+            return width + penalty_lower + penalty_upper
+
+        ws_snail = _get_winkler_array(yte, all_preds["Snail-1.0"]["lower"], all_preds["Snail-1.0"]["upper"])
+        ws_cp = _get_winkler_array(yte, all_preds["CP"]["lower"], all_preds["CP"]["upper"])
+
+        t_stat, p_val = paired_t_test(ws_snail, ws_cp)
+        print(f"   t-statistic: {t_stat:.4f}")
+        print(f"   p-value:     {p_val:.4f}")
+        if p_val < 0.05:
+            print("   结论: Snail-1.0 与 CP 的差异在统计上是显著的 (p < 0.05)。")
+        else:
+            print("   结论: Snail-1.0 与 CP 的差异在统计上不显著 (p >= 0.05)。")
 
     # 保存结果
     out_path = Path(args.output) if args.output else (
@@ -205,7 +254,7 @@ def cmd_train(args, ctx):
     if args.mode in ("baseline", "all"):
         print("\n📊 运行基线实验 ...")
         baseline_results = ctx["run_baseline_experiment"](
-            Xtr, ytr, Xvq1, yvq1, Xte, yte
+            Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv
         )
         results.update(baseline_results)
 
@@ -213,7 +262,7 @@ def cmd_train(args, ctx):
         betas = [args.beta] if args.beta else [0.5, 1.0, 2.0, 5.0]
         print(f"\n🐌 训练蜗牛壳模型 β={betas} ...")
         snail_results = ctx["run_snail_experiment"](
-            Xtr, ytr, Xv, yv, Xte, yte, beta_values=betas
+            Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
         )
         results.update(snail_results)
 
