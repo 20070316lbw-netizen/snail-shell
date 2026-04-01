@@ -198,9 +198,3 @@ processed_data/
 models/
 outputs/
 results/
-
-# Database files (DuckDB, SQLite)
-*.duckdb
-*.duckdb.wal
-*.db
-QQ_Quant_DB/
