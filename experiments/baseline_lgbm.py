@@ -304,6 +304,8 @@ def run_baseline_experiment(
     X_test: np.ndarray,
     y_test: np.ndarray,
     baseline_methods: Optional[list] = None,
+    X_val_q2_4: Optional[np.ndarray] = None,
+    y_val_q2_4: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     运行所有基线实验
@@ -332,12 +334,23 @@ def run_baseline_experiment(
         residual_model.fit(X_train, y_train)
         point_pred, lower, upper = residual_model.predict_interval(X_test)
 
-        results["Residual"] = {
+        result_dict = {
             "point_pred": point_pred,
             "lower": lower,
             "upper": upper,
             "interval": (lower, upper),
         }
+
+        if X_val_q2_4 is not None and y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = residual_model.predict_interval(X_val_q2_4)
+            result_dict["val_q2_4"] = {
+                "point_pred": v_point_pred,
+                "lower": v_lower,
+                "upper": v_upper,
+                "interval": (v_lower, v_upper),
+            }
+
+        results["Residual"] = result_dict
 
     # Conformal Prediction基线
     if "cp" in baseline_methods:
@@ -346,12 +359,23 @@ def run_baseline_experiment(
         cp_model.fit(X_train, y_train, X_val, y_val)
         point_pred, lower, upper = cp_model.predict_interval(X_test)
 
-        results["CP"] = {
+        result_dict = {
             "point_pred": point_pred,
             "lower": lower,
             "upper": upper,
             "interval": (lower, upper),
         }
+
+        if X_val_q2_4 is not None and y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = cp_model.predict_interval(X_val_q2_4)
+            result_dict["val_q2_4"] = {
+                "point_pred": v_point_pred,
+                "lower": v_lower,
+                "upper": v_upper,
+                "interval": (v_lower, v_upper),
+            }
+
+        results["CP"] = result_dict
 
     # 分位数回归基线（β=0）
     if "qr" in baseline_methods:
@@ -360,12 +384,23 @@ def run_baseline_experiment(
         qr_model.fit(X_train, y_train, X_val, y_val)
         point_pred, lower, upper = qr_model.predict_interval(X_test)
 
-        results["QR"] = {
+        result_dict = {
             "point_pred": point_pred,
             "lower": lower,
             "upper": upper,
             "interval": (lower, upper),
         }
+
+        if X_val_q2_4 is not None and y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = qr_model.predict_interval(X_val_q2_4)
+            result_dict["val_q2_4"] = {
+                "point_pred": v_point_pred,
+                "lower": v_lower,
+                "upper": v_upper,
+                "interval": (v_lower, v_upper),
+            }
+
+        results["QR"] = result_dict
 
     # Q50-only基线（β=∞）
     if "q50_only" in baseline_methods:
@@ -374,12 +409,23 @@ def run_baseline_experiment(
         q50_model.fit(X_train, y_train, X_val, y_val)
         point_pred, lower, upper = q50_model.predict_interval(X_test)
 
-        results["Q50-only"] = {
+        result_dict = {
             "point_pred": point_pred,
             "lower": lower,
             "upper": upper,
             "interval": (lower, upper),
         }
+
+        if X_val_q2_4 is not None and y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = q50_model.predict_interval(X_val_q2_4)
+            result_dict["val_q2_4"] = {
+                "point_pred": v_point_pred,
+                "lower": v_lower,
+                "upper": v_upper,
+                "interval": (v_lower, v_upper),
+            }
+
+        results["Q50-only"] = result_dict
 
     return results
 

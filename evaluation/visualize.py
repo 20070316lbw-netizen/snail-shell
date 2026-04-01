@@ -27,8 +27,8 @@ def plot_pareto_curve(
     """
     绘制Pareto曲线
 
-    所有方法在Coverage vs Width空间的散点图
-    目标是左下角（覆盖率高且区间窄）
+    所有方法在Coverage Error vs Width空间的散点图
+    目标是左下角（覆盖误差小且区间窄）
 
     Args:
         methods_data: 方法名到预测结果的映射
@@ -37,7 +37,7 @@ def plot_pareto_curve(
         figsize: 图形大小
     """
     # 收集数据
-    coverage_rates = []
+    coverage_errors = []
     avg_widths = []
     method_names = []
 
@@ -45,14 +45,15 @@ def plot_pareto_curve(
         lower = predictions["lower"]
         upper = predictions["upper"]
 
-        # 计算覆盖率
+        # 计算覆盖率并求Coverage Error
         in_interval = (y_true >= lower) & (y_true <= upper)
         coverage_rate = np.mean(in_interval)
+        ce = np.abs(coverage_rate - target_coverage)
 
         # 计算平均区间宽度
         avg_width = np.mean(upper - lower)
 
-        coverage_rates.append(coverage_rate)
+        coverage_errors.append(ce)
         avg_widths.append(avg_width)
         method_names.append(method_name)
 
@@ -60,42 +61,34 @@ def plot_pareto_curve(
     fig, ax = plt.subplots(figsize=figsize)
 
     # 绘制散点图
-    scatter = ax.scatter(avg_widths, coverage_rates, s=100, alpha=0.6)
+    scatter = ax.scatter(avg_widths, coverage_errors, s=100, alpha=0.6)
 
     # 添加标签
     for i, method_name in enumerate(method_names):
         ax.annotate(
             method_name,
-            (avg_widths[i], coverage_rates[i]),
+            (avg_widths[i], coverage_errors[i]),
             xytext=(5, 5),
             textcoords="offset points",
             fontsize=10,
             alpha=0.8,
         )
 
-    # 添加目标覆盖率线
-    ax.axhline(
-        y=target_coverage,
-        color="r",
-        linestyle="--",
-        label=f"目标覆盖率: {target_coverage:.1%}",
-    )
-
     # 设置图形属性
     ax.set_xlabel("平均区间宽度", fontsize=12)
-    ax.set_ylabel("实际覆盖率", fontsize=12)
-    ax.set_title("Pareto曲线: 覆盖率 vs 区间宽度", fontsize=14, fontweight="bold")
+    ax.set_ylabel("Coverage Error", fontsize=12)
+    ax.set_title("Pareto曲线: Coverage Error vs 区间宽度", fontsize=14, fontweight="bold")
     ax.grid(True, alpha=0.3)
     ax.legend()
 
     # 添加理想区域标记
     ax.text(
         0.05,
-        0.95,
-        "理想区域\n(窄区间 + 高覆盖)",
+        0.05,
+        "理想区域\n(窄区间 + 低Coverage Error)",
         transform=ax.transAxes,
         fontsize=10,
-        verticalalignment="top",
+        verticalalignment="bottom",
         bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.5),
     )
 
