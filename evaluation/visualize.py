@@ -131,8 +131,10 @@ def plot_time_dynamics(
 
         # 计算每个时间点的Winkler Score
         width = upper - lower
-        penalty_lower = np.where(y_true < lower, 10 * (lower - y_true), 0)
-        penalty_upper = np.where(y_true > upper, 10 * (y_true - upper), 0)
+        # 惧罚系数与 evaluation/metrics.winkler_score 保持一致：2/alpha = 2/0.2 = 10（80% CI）
+        _alpha = 0.2
+        penalty_lower = np.where(y_true < lower, (2 / _alpha) * (lower - y_true), 0)
+        penalty_upper = np.where(y_true > upper, (2 / _alpha) * (y_true - upper), 0)
         winkler_scores = width + penalty_lower + penalty_upper
 
         # 绘制原始分数

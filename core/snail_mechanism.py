@@ -10,8 +10,14 @@ snail_mechanism.py - 可信圆 + 软拉回机制（β 控制）
 ŷ_t* = α_t * ŷ_t + (1 - α_t) * a_t
 """
 
+import sys
+import os
 import numpy as np
 from typing import Tuple, Dict, Optional
+
+# 将项目根目录加入 sys.path，确保从任意工作目录调用时都能正确导入
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from evaluation.metrics import crossing_rate  # 统一维护于 evaluation/metrics.py，此处不重复定义
 
 
 def soft_pullback(
@@ -33,15 +39,8 @@ def soft_pullback(
     Returns:
         修正后的预测值 (ŷ_t*)
     """
-    # 防止除零
-    epsilon = 1e-8
-    radius_safe = np.maximum(radius, epsilon)
-
-    # 计算偏离度
-    deviation = np.abs(point_pred - anchor) / radius_safe
-
-    # 计算α_t
-    alpha = np.exp(-beta * deviation)
+    # 计算α_t（含 β=∞ 安全处理，委托给 calculate_alpha 避免逻辑重复）
+    alpha = calculate_alpha(point_pred, anchor, radius, beta)
 
     # 软拉回
     corrected_pred = alpha * point_pred + (1 - alpha) * anchor
@@ -67,29 +66,16 @@ def calculate_alpha(
     epsilon = 1e-8
     radius_safe = np.maximum(radius, epsilon)
     deviation = np.abs(point_pred - anchor) / radius_safe
-    alpha = np.exp(-beta * deviation)
+
+    # β=∞ 时应完全拉回（α=0），但 deviation==0（点预测 == 锚点）时不需拉回（α=1）
+    # np.exp(-inf * 0) = nan，静默污染所有后续计算，必须显式处理
+    if np.isinf(beta):
+        alpha = np.where(deviation == 0.0, 1.0, 0.0)
+    else:
+        alpha = np.exp(-beta * deviation)
 
     return alpha
 
-
-def crossing_rate(q10: np.ndarray, q90: np.ndarray) -> float:
-    """
-    计算分位数交叉率
-
-    如果分位数交叉（q10 > q90），说明分位数估计质量有限
-
-    Args:
-        q10: 10%分位数预测
-        q90: 90%分位数预测
-
-    Returns:
-        交叉率（0-1之间）
-    """
-    crossing_mask = q10 > q90
-    crossing_count = np.sum(crossing_mask)
-    total_count = len(q10)
-
-    return crossing_count / total_count if total_count > 0 else 0.0
 
 
 class SnailMechanism:
@@ -141,11 +127,11 @@ class SnailMechanism:
         Returns:
             (修正后的预测, 诊断信息) 元组
         """
-        # 计算α值
+        # 计算α值（含 β=∞ 安全处理）
         alpha = calculate_alpha(point_pred, anchor, radius, beta)
 
-        # 软拉回
-        corrected_pred = soft_pullback(point_pred, anchor, radius, beta)
+        # 软拉回（复用已计算的 alpha，避免重复调用 calculate_alpha）
+        corrected_pred = alpha * point_pred + (1 - alpha) * anchor
 
         # 计算统计信息
         diagnostics = {

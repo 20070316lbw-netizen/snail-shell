@@ -59,20 +59,34 @@ class ResidualBaseline:
         )
         self.residual_std = None
 
-    def fit(self, X_train: np.ndarray, y_train: np.ndarray) -> None:
+    def fit(
+        self,
+        X_train: np.ndarray,
+        y_train: np.ndarray,
+        X_val: Optional[np.ndarray] = None,
+        y_val: Optional[np.ndarray] = None,
+    ) -> None:
         """
         训练模型并计算残差标准差
 
         Args:
             X_train: 训练特征
             y_train: 训练标签
+            X_val: 验证特征（推荐提供，用于无偏估计残差 std）
+            y_val: 验证标签
         """
         # 训练模型
         self.model.fit(X_train, y_train)
 
-        # 计算训练集残差
-        y_pred = self.model.predict(X_train)
-        residuals = y_train - y_pred
+        # 优先使用验证集估计残差 std，避免训练集拟合后残差偏小导致区间偏窄（数据泄漏）
+        if X_val is not None and y_val is not None:
+            y_pred = self.model.predict(X_val)
+            residuals = y_val - y_pred
+            print("  [Residual] 使用验证集计算残差 std（推荐）")
+        else:
+            y_pred = self.model.predict(X_train)
+            residuals = y_train - y_pred
+            print("  [Residual] ⚠️  未提供验证集，使用训练集残差 std（可能偏窄）")
         self.residual_std = np.std(residuals)
 
     def predict_interval(
@@ -231,8 +245,9 @@ class QRBaseline:
         """
         predictions = self.quantile_head.predict(X)
 
-        # 使用q50作为点预测
-        point_pred = predictions["q50"]
+        # README规格：QR 的点预测来自 MSE 模型，而非 q50
+        # q50 作为点预测是 Q50-only 基线的定义，两者必须区分
+        point_pred = predictions["point"]
         lower = predictions["q10"]
         upper = predictions["q90"]
 
@@ -331,7 +346,8 @@ def run_baseline_experiment(
     if "residual" in baseline_methods:
         print("Running Residual baseline...")
         residual_model = ResidualBaseline()
-        residual_model.fit(X_train, y_train)
+        # 传入验证集以使用无偏残差 std 估计（修复 #7）
+        residual_model.fit(X_train, y_train, X_val, y_val)
         point_pred, lower, upper = residual_model.predict_interval(X_test)
 
         result_dict = {

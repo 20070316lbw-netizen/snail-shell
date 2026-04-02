@@ -350,9 +350,11 @@ def cmd_monitor(args, ctx):
     print("\n📐 螺旋监控结果：")
     print(f"  R²（对数螺线拟合）: {spiral_result.get('r_squared', 'N/A'):.4f}")
     print(f"  平均外扩速度 v_t  : {spiral_result.get('mean_velocity', 'N/A'):.6f}")
-    alert_count = spiral_result.get("alert_count", "N/A")
-    total_count = spiral_result.get("total_count", "N/A")
-    print(f"  预警触发次数      : {alert_count} / {total_count}")
+    _alerts = spiral_result.get("alerts", np.array([]))
+    alert_count = int(np.sum(_alerts))
+    total_count = len(_alerts)
+    alert_rate = spiral_result.get("alert_rate", 0.0)
+    print(f"  预警触发次数      : {alert_count} / {total_count}  (预警率 {alert_rate:.2%})")
 
     if spiral_result.get("r_squared", 0) < 0.5:
         print("\n  ⚠️  R² < 0.5，锚点轨迹螺线形态不明显，监控结论可信度有限。")

@@ -202,7 +202,7 @@ class DataLoader:
 
     def prepare_training_data(
         self, target_date: date, horizon: int = 1, index_group: str = "HS300"
-    ) -> Tuple[pd.DataFrame, np.ndarray]:
+    ) -> Tuple[pd.DataFrame, np.ndarray, np.ndarray]:
         """
         准备训练数据
 
@@ -212,7 +212,7 @@ class DataLoader:
             index_group: 指数组（默认HS300）
 
         Returns:
-            (特征DataFrame, 标签数组) 元组
+            (特征DataFrame, 特征矩阵 X, 标签数组 y) —— 共三个返回值
         """
         if not self.conn:
             self.connect()

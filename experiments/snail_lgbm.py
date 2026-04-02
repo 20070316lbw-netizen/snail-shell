@@ -108,7 +108,7 @@ class SnailModel:
         # 获取锚点和半径
         anchor, radius = self.quantile_head.predict_anchor_and_radius(X)
 
-        # 应用软拉回
+        # 应用软拉回（只调用一次，mean_alpha 从 diagnostics 中直接读取）
         point_pred = predictions["point"]
         corrected_pred, diagnostics = self.snail_mechanism.apply(
             point_pred, anchor, radius, self.beta
@@ -122,9 +122,7 @@ class SnailModel:
             "radius": radius,
             "q10": predictions["q10"],
             "q90": predictions["q90"],
-            "alpha": self.snail_mechanism.apply(point_pred, anchor, radius, self.beta)[
-                1
-            ]["mean_alpha"],
+            "alpha": diagnostics["mean_alpha"],  # 复用已计算的 diagnostics，不再重复调用
             "diagnostics": diagnostics,
         }
 
