@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 from core.quantile_head import pinball_loss
 
 def test_pinball_loss_basic():

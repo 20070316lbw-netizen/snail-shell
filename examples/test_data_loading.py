@@ -11,8 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.data_loader import DataLoader
 from config import get_database_path
-from datetime import date, datetime
-import pandas as pd
+from datetime import date
 
 
 def main():
@@ -106,7 +105,7 @@ def main():
         print(f"  财经新闻数量: {len(labeled_news)}")
 
         if not labeled_news.empty:
-            print(f"  标签分布:")
+            print("  标签分布:")
             label_counts = labeled_news["label"].value_counts()
             for label, count in label_counts.items():
                 print(f"    {label}: {count}")

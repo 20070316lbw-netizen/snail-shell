@@ -14,8 +14,6 @@ Alert_t = 1[v_t > μ_{v,t} + 2σ_{v,t}]
 import numpy as np
 from typing import Tuple, Dict, Optional
 from scipy import stats
-from scipy.optimize import curve_fit
-import warnings
 
 
 def cartesian_to_polar(a: np.ndarray, r: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -362,7 +360,7 @@ if __name__ == "__main__":
     # 分析
     results = monitor.analyze(anchor, radius)
 
-    print(f"\n分析结果:")
+    print("\n分析结果:")
     print(f"  螺线参数: log_A = {results['log_A']:.4f}, B = {results['B']:.4f}")
     print(f"  真实参数: log_A = {np.log(A):.4f}, B = {B:.4f}")
     print(f"  拟合质量: R² = {results['r_squared']:.4f}")
@@ -375,7 +373,7 @@ if __name__ == "__main__":
 
     # 获取统计信息
     stats = monitor.get_trajectory_stats()
-    print(f"\n轨迹统计:")
+    print("\n轨迹统计:")
     for category, values in stats.items():
         print(f"  {category}: {values}")
 

@@ -1,4 +1,3 @@
-import pytest
 import numpy as np
 import warnings
 from evaluation.metrics import coverage_error

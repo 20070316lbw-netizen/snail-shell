@@ -347,7 +347,7 @@ def cmd_monitor(args, ctx):
     monitor = ctx["SpiralMonitor"]()
     spiral_result = monitor.analyze(anchor, radius)
 
-    print(f"\n📐 螺旋监控结果：")
+    print("\n📐 螺旋监控结果：")
     print(f"  R²（对数螺线拟合）: {spiral_result.get('r_squared', 'N/A'):.4f}")
     print(f"  平均外扩速度 v_t  : {spiral_result.get('mean_velocity', 'N/A'):.6f}")
     alert_count = spiral_result.get("alert_count", "N/A")

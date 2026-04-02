@@ -10,7 +10,7 @@ metrics.py - 评估指标
 """
 
 import numpy as np
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Optional, Tuple
 from scipy import stats
 import pandas as pd
 
@@ -338,7 +338,7 @@ if __name__ == "__main__":
         print(f"  {metric_name}: {value:.4f}")
 
     # 测试Winkler Score计算
-    print(f"\nWinkler Score details:")
+    print("\nWinkler Score details:")
     ws = winkler_score(y_true, lower, upper)
     print(f"  Average Winkler Score: {ws:.4f}")
 
