@@ -25,7 +25,6 @@ from evaluation.metrics import (
     winkler_score,
     interval_width,
     mean_absolute_error,
-    rank_ic,
 )
 
 
