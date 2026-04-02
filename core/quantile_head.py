@@ -44,31 +44,6 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> 
     return np.mean(np.maximum(alpha * residual, (alpha - 1) * residual))
 
 
-def quantile_loss_objective(
-    y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    分位数回归的目标函数和梯度
-
-    Args:
-        y_true: 真实值
-        y_pred: 预测值
-        alpha: 分位数参数
-
-    Returns:
-        损失值和梯度
-    """
-    residual = y_true - y_pred
-
-    # 梯度
-    grad = np.where(residual < 0, alpha - 1, alpha)
-
-    # Hessian（近似）
-    hess = np.ones_like(y_true)
-
-    return grad, hess
-
-
 class QuantileHead:
     """
     四模型分位数回归头
