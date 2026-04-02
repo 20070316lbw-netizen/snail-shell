@@ -17,7 +17,6 @@ main.py - snail-shell 统一实验入口
 
 import argparse
 import sys
-import os
 import warnings
 from pathlib import Path
 from datetime import datetime
