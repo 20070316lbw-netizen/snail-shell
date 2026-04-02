@@ -12,7 +12,6 @@ Alert_t = 1[v_t > μ_{v,t} + 2σ_{v,t}]
 """
 
 import numpy as np
-import pandas as pd
 from typing import Tuple, Dict, Optional
 from scipy import stats
 from scipy.optimize import curve_fit
