@@ -12,7 +12,6 @@ snail_mechanism.py - 可信圆 + 软拉回机制（β 控制）
 
 import numpy as np
 from typing import Tuple, Dict, Optional
-import warnings
 
 
 def soft_pullback(
