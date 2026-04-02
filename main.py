@@ -35,7 +35,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 def _import_core():
     from config import DATA_SPLIT, BETA_VALUES, OUTPUTS_DIR, RESULTS_DIR, get_project_info
     from core.data_loader import DataLoader
-    from core.quantile_head import QuantileHead
+    from core.quantile_head import QuantileHead, QuantileHeadConfig
     from core.snail_mechanism import SnailMechanism
     from core.spiral_monitor import SpiralMonitor
     from experiments.baseline_lgbm import run_baseline_experiment
@@ -49,6 +49,7 @@ def _import_core():
         "get_project_info": get_project_info,
         "DataLoader": DataLoader,
         "QuantileHead": QuantileHead,
+        "QuantileHeadConfig": QuantileHeadConfig,
         "SnailMechanism": SnailMechanism,
         "SpiralMonitor": SpiralMonitor,
         "run_baseline_experiment": run_baseline_experiment,
@@ -321,7 +322,8 @@ def cmd_monitor(args, ctx):
 
     # 训练分位数回归头
     print(f"\n   训练 QuantileHead（β={beta}）...")
-    qh = ctx["QuantileHead"]()
+    config = ctx["QuantileHeadConfig"]()
+    qh = ctx["QuantileHead"](config=config)
     qh.fit(Xtr, ytr, Xv, yv)
 
     # 测试集预测
