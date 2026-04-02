@@ -13,7 +13,6 @@ import pandas as pd
 import lightgbm as lgb
 from typing import Dict, Tuple, Optional
 import warnings
-from dataclasses import dataclass
 
 
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> float:
@@ -59,18 +58,6 @@ def quantile_loss_objective(
     return grad, hess
 
 
-@dataclass
-class QuantileHeadConfig:
-    """
-    QuantileHead 的配置类
-    """
-    params: Optional[Dict] = None
-    n_estimators: int = 1000
-    learning_rate: float = 0.05
-    early_stopping_rounds: int = 50
-    random_state: int = 42
-
-
 class QuantileHead:
     """
     四模型分位数回归头
@@ -84,27 +71,32 @@ class QuantileHead:
 
     def __init__(
         self,
-        config: Optional[QuantileHeadConfig] = None,
+        params: Optional[Dict] = None,
+        n_estimators: int = 1000,
+        learning_rate: float = 0.05,
+        early_stopping_rounds: int = 50,
+        random_state: int = 42,
     ):
         """
         初始化分位数回归头
 
         Args:
-            config: 分位数回归头配置对象
+            params: LightGBM参数字典
+            n_estimators: 树的数量
+            learning_rate: 学习率
+            early_stopping_rounds: 早停轮数
+            random_state: 随机种子
         """
-        if config is None:
-            config = QuantileHeadConfig()
-
-        self.n_estimators = config.n_estimators
-        self.learning_rate = config.learning_rate
-        self.early_stopping_rounds = config.early_stopping_rounds
-        self.random_state = config.random_state
+        self.n_estimators = n_estimators
+        self.learning_rate = learning_rate
+        self.early_stopping_rounds = early_stopping_rounds
+        self.random_state = random_state
 
         # 默认参数
         self.default_params = {
             "boosting_type": "gbdt",
-            "n_estimators": self.n_estimators,
-            "learning_rate": self.learning_rate,
+            "n_estimators": n_estimators,
+            "learning_rate": learning_rate,
             "num_leaves": 31,
             "max_depth": -1,
             "min_child_samples": 20,
@@ -112,13 +104,13 @@ class QuantileHead:
             "colsample_bytree": 0.8,
             "reg_alpha": 0.1,
             "reg_lambda": 0.1,
-            "random_state": self.random_state,
+            "random_state": random_state,
             "n_jobs": -1,
             "verbose": -1,
         }
 
-        if config.params:
-            self.default_params.update(config.params)
+        if params:
+            self.default_params.update(params)
 
         # 初始化模型
         self.models = {
@@ -318,8 +310,7 @@ if __name__ == "__main__":
     y_train, y_val = y[:train_size], y[train_size:]
 
     # 创建并训练模型
-    config = QuantileHeadConfig(n_estimators=100, early_stopping_rounds=20)
-    qh = QuantileHead(config=config)
+    qh = QuantileHead(n_estimators=100, early_stopping_rounds=20)
     qh.fit(X_train, y_train, X_val, y_val)
 
     # 预测

@@ -17,7 +17,7 @@ import os
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.quantile_head import QuantileHead, QuantileHeadConfig
+from core.quantile_head import QuantileHead
 from core.snail_mechanism import SnailMechanism
 from evaluation.metrics import (
     coverage_error,
@@ -56,13 +56,12 @@ class SnailModel:
         self.beta = beta
 
         # 分位数回归头
-        config = QuantileHeadConfig(
+        self.quantile_head = QuantileHead(
             n_estimators=n_estimators,
             learning_rate=learning_rate,
             early_stopping_rounds=early_stopping_rounds,
             random_state=random_state,
         )
-        self.quantile_head = QuantileHead(config=config)
 
         # 蜗牛壳机制
         self.snail_mechanism = SnailMechanism()
@@ -247,8 +246,7 @@ def select_best_beta(
         beta_candidates = [0.0, 0.5, 1.0, 2.0, 5.0, np.inf]
 
     # 先训练分位数回归头（所有β共享）
-    config = QuantileHeadConfig()
-    qh = QuantileHead(config=config)
+    qh = QuantileHead()
     qh.fit(X_train, y_train, X_val, y_val)
 
     # 获取锚点和半径
