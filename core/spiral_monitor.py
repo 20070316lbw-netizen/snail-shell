@@ -12,10 +12,9 @@ Alert_t = 1[v_t > μ_{v,t} + 2σ_{v,t}]
 """
 
 import numpy as np
+import pandas as pd
 from typing import Tuple, Dict, Optional
 from scipy import stats
-from scipy.optimize import curve_fit
-import warnings
 
 
 def cartesian_to_polar(a: np.ndarray, r: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
@@ -132,15 +131,20 @@ def rolling_alert(
     n = len(velocity)
     alerts = np.zeros(n)
 
-    for i in range(window, n):
-        # 计算滚动窗口的统计量
-        window_velocities = velocity[i - window : i]
-        mu = np.mean(window_velocities)
-        sigma = np.std(window_velocities)
+    if n > window:
+        vel_series = pd.Series(velocity)
+
+        # 计算滚动窗口的统计量 (排除当前时刻)
+        # pandas 的 std 默认是样本标准差 (ddof=1)，这里指定 ddof=0 匹配 numpy.std 的默认行为
+        rolling_window = vel_series.shift(1).rolling(window=window)
+        mu = rolling_window.mean().to_numpy()
+        sigma = rolling_window.std(ddof=0).to_numpy()
 
         # 判断是否预警
-        if velocity[i] > mu + threshold_sigma * sigma:
-            alerts[i] = 1
+        # 我们只在 [window, n) 范围内比较，避免 NaN 带来的 RuntimeWarning
+        mask = np.zeros(n, dtype=bool)
+        mask[window:] = velocity[window:] > (mu[window:] + threshold_sigma * sigma[window:])
+        alerts[mask] = 1
 
     return alerts
 
@@ -362,7 +366,7 @@ if __name__ == "__main__":
     # 分析
     results = monitor.analyze(anchor, radius)
 
-    print(f"\n分析结果:")
+    print("\n分析结果:")
     print(f"  螺线参数: log_A = {results['log_A']:.4f}, B = {results['B']:.4f}")
     print(f"  真实参数: log_A = {np.log(A):.4f}, B = {B:.4f}")
     print(f"  拟合质量: R² = {results['r_squared']:.4f}")
@@ -375,7 +379,7 @@ if __name__ == "__main__":
 
     # 获取统计信息
     stats = monitor.get_trajectory_stats()
-    print(f"\n轨迹统计:")
+    print("\n轨迹统计:")
     for category, values in stats.items():
         print(f"  {category}: {values}")
 
