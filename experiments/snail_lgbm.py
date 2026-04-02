@@ -11,6 +11,7 @@ snail_lgbm.py - Snail-0.5/1/2/5 实验
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
+from dataclasses import dataclass
 import sys
 import os
 
@@ -150,32 +151,31 @@ class SnailModel:
         return point_pred, lower, upper
 
 
-def run_snail_experiment(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-    beta_values: Optional[List[float]] = None,
-    X_val_q2_4: Optional[np.ndarray] = None,
-    y_val_q2_4: Optional[np.ndarray] = None,
-) -> Dict:
+@dataclass
+class ExperimentConfig:
+    """实验配置数据类"""
+    X_train: np.ndarray
+    y_train: np.ndarray
+    X_val: np.ndarray
+    y_val: np.ndarray
+    X_test: np.ndarray
+    y_test: np.ndarray
+    beta_values: Optional[List[float]] = None
+    X_val_q2_4: Optional[np.ndarray] = None
+    y_val_q2_4: Optional[np.ndarray] = None
+
+
+def run_snail_experiment(config: ExperimentConfig) -> Dict:
     """
     运行蜗牛壳实验
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
-        beta_values: β值列表
+        config: 实验配置数据类
 
     Returns:
         实验结果字典
     """
+    beta_values = config.beta_values
     if beta_values is None:
         beta_values = [0.5, 1.0, 2.0, 5.0]
 
@@ -186,10 +186,10 @@ def run_snail_experiment(
 
         # 创建并训练模型
         model = SnailModel(beta=beta)
-        model.fit(X_train, y_train, X_val, y_val)
+        model.fit(config.X_train, config.y_train, config.X_val, config.y_val)
 
         # 预测
-        predictions = model.predict(X_test)
+        predictions = model.predict(config.X_test)
         point_pred = predictions["corrected_point"]
         lower = predictions["q10"]
         upper = predictions["q90"]
@@ -204,8 +204,8 @@ def run_snail_experiment(
             "diagnostics": predictions["diagnostics"],
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_predictions = model.predict(X_val_q2_4)
+        if config.X_val_q2_4 is not None and config.y_val_q2_4 is not None:
+            v_predictions = model.predict(config.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_predictions["corrected_point"],
                 "lower": v_predictions["q10"],
@@ -288,9 +288,16 @@ def compare_snail_variants(
     """
     beta_values = [0.5, 1.0, 2.0, 5.0]
 
-    results = run_snail_experiment(
-        X_train, y_train, X_val, y_val, X_test, y_test, beta_values
+    config = ExperimentConfig(
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        X_test=X_test,
+        y_test=y_test,
+        beta_values=beta_values
     )
+    results = run_snail_experiment(config)
 
     # 收集结果
     comparison_data = []
@@ -355,7 +362,15 @@ if __name__ == "__main__":
 
     # 运行蜗牛壳实验
     print("\nRunning Snail experiments...")
-    results = run_snail_experiment(X_train, y_train, X_val, y_val, X_test, y_test)
+    config = ExperimentConfig(
+        X_train=X_train,
+        y_train=y_train,
+        X_val=X_val,
+        y_val=y_val,
+        X_test=X_test,
+        y_test=y_test
+    )
+    results = run_snail_experiment(config)
 
     # 评估结果
     print("\nSnail Experiment Results:")
