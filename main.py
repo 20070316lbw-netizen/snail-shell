@@ -39,7 +39,7 @@ def _import_core():
     from core.snail_mechanism import SnailMechanism
     from core.spiral_monitor import SpiralMonitor
     from experiments.baseline_lgbm import run_baseline_experiment
-    from experiments.snail_lgbm import run_snail_experiment, select_best_beta
+    from experiments.snail_lgbm import run_snail_experiment, select_best_beta, ExperimentConfig
     from evaluation.metrics import evaluate_methods, calculate_all_metrics
     return {
         "DATA_SPLIT": DATA_SPLIT,
@@ -54,6 +54,7 @@ def _import_core():
         "SpiralMonitor": SpiralMonitor,
         "run_baseline_experiment": run_baseline_experiment,
         "run_snail_experiment": run_snail_experiment,
+        "ExperimentConfig": ExperimentConfig,
         "select_best_beta": select_best_beta,
         "evaluate_methods": evaluate_methods,
         "calculate_all_metrics": calculate_all_metrics,
@@ -177,9 +178,18 @@ def cmd_compare(args, ctx):
     # ── 蜗牛壳变体 ──────────────────────────────────────────────
     betas = args.betas if args.betas else [0.5, 1.0, 2.0, 5.0]
     print(f"\n🐌 运行蜗牛壳变体 β={betas} ...")
-    snail_results = ctx["run_snail_experiment"](
-        Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
+    config = ctx["ExperimentConfig"](
+        X_train=Xtr,
+        y_train=ytr,
+        X_val=Xvq1,
+        y_val=yvq1,
+        X_test=Xte,
+        y_test=yte,
+        beta_values=betas,
+        X_val_q2_4=Xv,
+        y_val_q2_4=yv
     )
+    snail_results = ctx["run_snail_experiment"](config)
     all_preds.update(snail_results)
 
     # ── 汇总评估 (Test Set) ────────────────────────────────────────────────
@@ -258,9 +268,18 @@ def cmd_train(args, ctx):
     if args.mode in ("snail", "all"):
         betas = [args.beta] if args.beta else [0.5, 1.0, 2.0, 5.0]
         print(f"\n🐌 训练蜗牛壳模型 β={betas} ...")
-        snail_results = ctx["run_snail_experiment"](
-            Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
+        config = ctx["ExperimentConfig"](
+            X_train=Xtr,
+            y_train=ytr,
+            X_val=Xvq1,
+            y_val=yvq1,
+            X_test=Xte,
+            y_test=yte,
+            beta_values=betas,
+            X_val_q2_4=Xv,
+            y_val_q2_4=yv
         )
+        snail_results = ctx["run_snail_experiment"](config)
         results.update(snail_results)
 
     print("\n📈 测试集评估：")
