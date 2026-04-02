@@ -11,7 +11,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 
 # 数据库路径
-DATABASE_PATH = PROJECT_ROOT / "QQ_Quant_DB" / "quant_lab.duckdb"
+DATABASE_PATH = os.path.join(os.path.dirname(__file__), "QQ_Quant_DB", "quant_lab.duckdb")
 
 # 数据目录
 DATA_DIR = PROJECT_ROOT / "data"
