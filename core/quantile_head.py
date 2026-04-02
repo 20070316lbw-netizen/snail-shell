@@ -12,7 +12,18 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 from typing import Dict, Tuple, Optional
+from dataclasses import dataclass
 import warnings
+
+
+@dataclass
+class FitConfig:
+    """训练配置类"""
+    X_train: np.ndarray
+    y_train: np.ndarray
+    X_val: Optional[np.ndarray] = None
+    y_val: Optional[np.ndarray] = None
+    callbacks: Optional[list] = None
 
 
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> float:
@@ -151,22 +162,18 @@ class QuantileHead:
 
     def fit(
         self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        X_val: Optional[np.ndarray] = None,
-        y_val: Optional[np.ndarray] = None,
-        callbacks: Optional[list] = None,
+        config: FitConfig,
     ) -> None:
         """
         训练四个模型
 
         Args:
-            X_train: 训练特征
-            y_train: 训练标签
-            X_val: 验证特征
-            y_val: 验证标签
-            callbacks: 回调函数列表
+            config: 训练配置类实例
         """
+        X_train, y_train = config.X_train, config.y_train
+        X_val, y_val = config.X_val, config.y_val
+        callbacks = config.callbacks
+
         # 准备验证集
         eval_set = [(X_val, y_val)] if X_val is not None and y_val is not None else None
         eval_names = ["validation"] if eval_set else None
@@ -311,7 +318,8 @@ if __name__ == "__main__":
 
     # 创建并训练模型
     qh = QuantileHead(n_estimators=100, early_stopping_rounds=20)
-    qh.fit(X_train, y_train, X_val, y_val)
+    config = FitConfig(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+    qh.fit(config)
 
     # 预测
     predictions = qh.predict(X_val[:5])
