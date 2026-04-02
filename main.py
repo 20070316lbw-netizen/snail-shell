@@ -35,6 +35,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 def _import_core():
     from config import DATA_SPLIT, BETA_VALUES, OUTPUTS_DIR, RESULTS_DIR, get_project_info
     from core.data_loader import DataLoader
+    from core.experiment_data import ExperimentData
     from core.quantile_head import QuantileHead
     from core.snail_mechanism import SnailMechanism
     from core.spiral_monitor import SpiralMonitor
@@ -48,6 +49,7 @@ def _import_core():
         "RESULTS_DIR": RESULTS_DIR,
         "get_project_info": get_project_info,
         "DataLoader": DataLoader,
+        "ExperimentData": ExperimentData,
         "QuantileHead": QuantileHead,
         "SnailMechanism": SnailMechanism,
         "SpiralMonitor": SpiralMonitor,
@@ -170,19 +172,18 @@ def cmd_compare(args, ctx):
 
     all_preds = {}  # 方法名 → {point_pred, lower, upper}
 
+    # ── 构造数据集 ──────────────────────────────────────────────
+    experiment_data = ctx["ExperimentData"](Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv)
+
     # ── 基线实验 ────────────────────────────────────────────────
     print("\n📊 运行基线实验 ...")
-    baseline_results = ctx["run_baseline_experiment"](
-        Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv
-    )
+    baseline_results = ctx["run_baseline_experiment"](experiment_data)
     all_preds.update(baseline_results)
 
     # ── 蜗牛壳变体 ──────────────────────────────────────────────
     betas = args.betas if args.betas else [0.5, 1.0, 2.0, 5.0]
     print(f"\n🐌 运行蜗牛壳变体 β={betas} ...")
-    snail_results = ctx["run_snail_experiment"](
-        Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
-    )
+    snail_results = ctx["run_snail_experiment"](experiment_data, beta_values=betas)
     all_preds.update(snail_results)
 
     # ── 汇总评估 (Test Set) ────────────────────────────────────────────────
@@ -251,19 +252,17 @@ def cmd_train(args, ctx):
 
     results = {}
 
+    experiment_data = ctx["ExperimentData"](Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv)
+
     if args.mode in ("baseline", "all"):
         print("\n📊 运行基线实验 ...")
-        baseline_results = ctx["run_baseline_experiment"](
-            Xtr, ytr, Xvq1, yvq1, Xte, yte, X_val_q2_4=Xv, y_val_q2_4=yv
-        )
+        baseline_results = ctx["run_baseline_experiment"](experiment_data)
         results.update(baseline_results)
 
     if args.mode in ("snail", "all"):
         betas = [args.beta] if args.beta else [0.5, 1.0, 2.0, 5.0]
         print(f"\n🐌 训练蜗牛壳模型 β={betas} ...")
-        snail_results = ctx["run_snail_experiment"](
-            Xtr, ytr, Xvq1, yvq1, Xte, yte, beta_values=betas, X_val_q2_4=Xv, y_val_q2_4=yv
-        )
+        snail_results = ctx["run_snail_experiment"](experiment_data, beta_values=betas)
         results.update(snail_results)
 
     print("\n📈 测试集评估：")
@@ -282,16 +281,27 @@ def cmd_beta_select(args, ctx):
     print("=" * 60)
 
     try:
-        Xtr, ytr, _, _, Xv, yv, _, _ = load_data(ctx)
+        Xtr, ytr, Xvq1, yvq1, Xv, yv, Xte, yte = load_data(ctx)
     except Exception as e:
         print(f"⚠️  数据库加载失败: {e}")
         print("   使用模拟数据继续运行...")
-        Xtr, ytr, _, _, Xv, yv, _, _ = _mock_data(ctx)
+        Xtr, ytr, Xvq1, yvq1, Xv, yv, Xte, yte = _mock_data(ctx)
+
+    experiment_data = ctx["ExperimentData"](
+        X_train=Xtr,
+        y_train=ytr,
+        X_val=Xv,
+        y_val=yv,
+        X_test=Xte,
+        y_test=yte,
+        X_val_q2_4=Xv,
+        y_val_q2_4=yv
+    )
 
     beta_candidates = ctx["BETA_VALUES"]
     print(f"   候选 β 值: {beta_candidates}")
 
-    best_beta, beta_scores = ctx["select_best_beta"](Xtr, ytr, Xv, yv, beta_candidates)
+    best_beta, beta_scores = ctx["select_best_beta"](experiment_data, beta_candidates)
 
     print(f"\n{'─'*60}")
     print(f"  {'β':>8}  {'Score':>10}  {'MAE':>10}  {'Winkler':>10}")

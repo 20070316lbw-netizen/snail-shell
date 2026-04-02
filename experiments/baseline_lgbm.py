@@ -20,6 +20,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.quantile_head import QuantileHead
+from core.experiment_data import ExperimentData
 from evaluation.metrics import (
     coverage_error,
     winkler_score,
@@ -297,26 +298,14 @@ class Q50OnlyBaseline:
 
 
 def run_baseline_experiment(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
+    data: ExperimentData,
     baseline_methods: Optional[list] = None,
-    X_val_q2_4: Optional[np.ndarray] = None,
-    y_val_q2_4: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     运行所有基线实验
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
+        data: 实验数据集
         baseline_methods: 基线方法列表
 
     Returns:
@@ -331,8 +320,8 @@ def run_baseline_experiment(
     if "residual" in baseline_methods:
         print("Running Residual baseline...")
         residual_model = ResidualBaseline()
-        residual_model.fit(X_train, y_train)
-        point_pred, lower, upper = residual_model.predict_interval(X_test)
+        residual_model.fit(data.X_train, data.y_train)
+        point_pred, lower, upper = residual_model.predict_interval(data.X_test)
 
         result_dict = {
             "point_pred": point_pred,
@@ -341,8 +330,8 @@ def run_baseline_experiment(
             "interval": (lower, upper),
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_point_pred, v_lower, v_upper = residual_model.predict_interval(X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = residual_model.predict_interval(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_point_pred,
                 "lower": v_lower,
@@ -356,8 +345,8 @@ def run_baseline_experiment(
     if "cp" in baseline_methods:
         print("Running Conformal Prediction baseline...")
         cp_model = ConformalPredictionBaseline()
-        cp_model.fit(X_train, y_train, X_val, y_val)
-        point_pred, lower, upper = cp_model.predict_interval(X_test)
+        cp_model.fit(data.X_train, data.y_train, data.X_val, data.y_val)
+        point_pred, lower, upper = cp_model.predict_interval(data.X_test)
 
         result_dict = {
             "point_pred": point_pred,
@@ -366,8 +355,8 @@ def run_baseline_experiment(
             "interval": (lower, upper),
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_point_pred, v_lower, v_upper = cp_model.predict_interval(X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = cp_model.predict_interval(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_point_pred,
                 "lower": v_lower,
@@ -381,8 +370,8 @@ def run_baseline_experiment(
     if "qr" in baseline_methods:
         print("Running QR baseline (β=0)...")
         qr_model = QRBaseline()
-        qr_model.fit(X_train, y_train, X_val, y_val)
-        point_pred, lower, upper = qr_model.predict_interval(X_test)
+        qr_model.fit(data.X_train, data.y_train, data.X_val, data.y_val)
+        point_pred, lower, upper = qr_model.predict_interval(data.X_test)
 
         result_dict = {
             "point_pred": point_pred,
@@ -391,8 +380,8 @@ def run_baseline_experiment(
             "interval": (lower, upper),
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_point_pred, v_lower, v_upper = qr_model.predict_interval(X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = qr_model.predict_interval(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_point_pred,
                 "lower": v_lower,
@@ -406,8 +395,8 @@ def run_baseline_experiment(
     if "q50_only" in baseline_methods:
         print("Running Q50-only baseline (β=∞)...")
         q50_model = Q50OnlyBaseline()
-        q50_model.fit(X_train, y_train, X_val, y_val)
-        point_pred, lower, upper = q50_model.predict_interval(X_test)
+        q50_model.fit(data.X_train, data.y_train, data.X_val, data.y_val)
+        point_pred, lower, upper = q50_model.predict_interval(data.X_test)
 
         result_dict = {
             "point_pred": point_pred,
@@ -416,8 +405,8 @@ def run_baseline_experiment(
             "interval": (lower, upper),
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_point_pred, v_lower, v_upper = q50_model.predict_interval(X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_point_pred, v_lower, v_upper = q50_model.predict_interval(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_point_pred,
                 "lower": v_lower,
@@ -458,7 +447,8 @@ if __name__ == "__main__":
     print(f"Data shapes: Train={X_train.shape}, Val={X_val.shape}, Test={X_test.shape}")
 
     # 运行基线实验
-    results = run_baseline_experiment(X_train, y_train, X_val, y_val, X_test, y_test)
+    data = ExperimentData(X_train, y_train, X_val, y_val, X_test, y_test)
+    results = run_baseline_experiment(data)
 
     # 评估结果
     print("\nBaseline Results:")

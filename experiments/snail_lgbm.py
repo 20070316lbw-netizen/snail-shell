@@ -18,6 +18,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.quantile_head import QuantileHead
+from core.experiment_data import ExperimentData
 from core.snail_mechanism import SnailMechanism
 from evaluation.metrics import (
     coverage_error,
@@ -151,26 +152,14 @@ class SnailModel:
 
 
 def run_snail_experiment(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
+    data: ExperimentData,
     beta_values: Optional[List[float]] = None,
-    X_val_q2_4: Optional[np.ndarray] = None,
-    y_val_q2_4: Optional[np.ndarray] = None,
 ) -> Dict:
     """
     运行蜗牛壳实验
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
+        data: 实验数据集
         beta_values: β值列表
 
     Returns:
@@ -186,10 +175,10 @@ def run_snail_experiment(
 
         # 创建并训练模型
         model = SnailModel(beta=beta)
-        model.fit(X_train, y_train, X_val, y_val)
+        model.fit(data.X_train, data.y_train, data.X_val, data.y_val)
 
         # 预测
-        predictions = model.predict(X_test)
+        predictions = model.predict(data.X_test)
         point_pred = predictions["corrected_point"]
         lower = predictions["q10"]
         upper = predictions["q90"]
@@ -204,8 +193,8 @@ def run_snail_experiment(
             "diagnostics": predictions["diagnostics"],
         }
 
-        if X_val_q2_4 is not None and y_val_q2_4 is not None:
-            v_predictions = model.predict(X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_predictions = model.predict(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_predictions["corrected_point"],
                 "lower": v_predictions["q10"],
@@ -220,10 +209,7 @@ def run_snail_experiment(
 
 
 def select_best_beta(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
+    data: ExperimentData,
     beta_candidates: Optional[List[float]] = None,
 ) -> Tuple[float, Dict]:
     """
@@ -233,10 +219,7 @@ def select_best_beta(
     Score = W̄ + 10 * max(0, CE - 0.05)
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
+        data: 实验数据集（包含训练特征/标签和验证特征/标签）
         beta_candidates: β候选值
 
     Returns:
@@ -247,41 +230,31 @@ def select_best_beta(
 
     # 先训练分位数回归头（所有β共享）
     qh = QuantileHead()
-    qh.fit(X_train, y_train, X_val, y_val)
+    qh.fit(data.X_train, data.y_train, data.X_val, data.y_val)
 
     # 获取锚点和半径
-    anchor, radius = qh.predict_anchor_and_radius(X_val)
+    anchor, radius = qh.predict_anchor_and_radius(data.X_val)
 
     # 获取点预测（MSE模型）
-    point_pred = qh.models["mse"].predict(X_val)
+    point_pred = qh.models["mse"].predict(data.X_val)
 
     # 创建蜗牛壳机制
     snail = SnailMechanism(beta_values=beta_candidates)
 
     # 选择最优β
-    best_beta, beta_scores = snail.select_beta(point_pred, anchor, radius, y_val)
+    best_beta, beta_scores = snail.select_beta(point_pred, anchor, radius, data.y_val)
 
     return best_beta, beta_scores
 
 
 def compare_snail_variants(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
+    data: ExperimentData,
 ) -> pd.DataFrame:
     """
     比较不同蜗牛壳变体
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
+        data: 实验数据集
 
     Returns:
         比较结果DataFrame
@@ -289,7 +262,7 @@ def compare_snail_variants(
     beta_values = [0.5, 1.0, 2.0, 5.0]
 
     results = run_snail_experiment(
-        X_train, y_train, X_val, y_val, X_test, y_test, beta_values
+        data, beta_values
     )
 
     # 收集结果
@@ -302,10 +275,10 @@ def compare_snail_variants(
         diagnostics = result["diagnostics"]
 
         # 计算评估指标
-        ce = coverage_error(y_test, lower, upper)
-        ws = winkler_score(y_test, lower, upper)
+        ce = coverage_error(data.y_test, lower, upper)
+        ws = winkler_score(data.y_test, lower, upper)
         iw = interval_width(lower, upper)
-        mae = mean_absolute_error(y_test, point_pred)
+        mae = mean_absolute_error(data.y_test, point_pred)
 
         comparison_data.append(
             {
@@ -353,9 +326,12 @@ if __name__ == "__main__":
 
     print(f"Data shapes: Train={X_train.shape}, Val={X_val.shape}, Test={X_test.shape}")
 
+    # 创建ExperimentData
+    data = ExperimentData(X_train, y_train, X_val, y_val, X_test, y_test)
+
     # 运行蜗牛壳实验
     print("\nRunning Snail experiments...")
-    results = run_snail_experiment(X_train, y_train, X_val, y_val, X_test, y_test)
+    results = run_snail_experiment(data)
 
     # 评估结果
     print("\nSnail Experiment Results:")
@@ -384,7 +360,7 @@ if __name__ == "__main__":
     # 选择最优β
     print("\n" + "=" * 80)
     print("Selecting best beta on validation set...")
-    best_beta, beta_scores = select_best_beta(X_train, y_train, X_val, y_val)
+    best_beta, beta_scores = select_best_beta(data)
     print(f"Best beta: {best_beta}")
 
     # 显示所有β的评分
