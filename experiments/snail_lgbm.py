@@ -18,6 +18,7 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.quantile_head import QuantileHead
+from dataclasses import dataclass
 from core.snail_mechanism import SnailMechanism
 from evaluation.metrics import (
     coverage_error,
@@ -26,6 +27,16 @@ from evaluation.metrics import (
     mean_absolute_error,
     rank_ic,
 )
+
+
+@dataclass
+class SnailModelConfig:
+    """蜗牛壳模型配置"""
+    beta: float = 1.0
+    n_estimators: int = 1000
+    learning_rate: float = 0.05
+    early_stopping_rounds: int = 50
+    random_state: int = 42
 
 
 class SnailModel:
@@ -37,30 +48,25 @@ class SnailModel:
 
     def __init__(
         self,
-        beta: float = 1.0,
-        n_estimators: int = 1000,
-        learning_rate: float = 0.05,
-        early_stopping_rounds: int = 50,
-        random_state: int = 42,
+        config: Optional[SnailModelConfig] = None,
     ):
         """
         初始化蜗牛壳模型
 
         Args:
-            beta: 软拉回参数
-            n_estimators: 树的数量
-            learning_rate: 学习率
-            early_stopping_rounds: 早停轮数
-            random_state: 随机种子
+            config: 模型配置参数
         """
-        self.beta = beta
+        if config is None:
+            config = SnailModelConfig()
+        self.config = config
+        self.beta = config.beta
 
         # 分位数回归头
         self.quantile_head = QuantileHead(
-            n_estimators=n_estimators,
-            learning_rate=learning_rate,
-            early_stopping_rounds=early_stopping_rounds,
-            random_state=random_state,
+            n_estimators=config.n_estimators,
+            learning_rate=config.learning_rate,
+            early_stopping_rounds=config.early_stopping_rounds,
+            random_state=config.random_state,
         )
 
         # 蜗牛壳机制
@@ -185,7 +191,8 @@ def run_snail_experiment(
         print(f"Running Snail-β={beta} experiment...")
 
         # 创建并训练模型
-        model = SnailModel(beta=beta)
+        config = SnailModelConfig(beta=beta)
+        model = SnailModel(config=config)
         model.fit(X_train, y_train, X_val, y_val)
 
         # 预测
