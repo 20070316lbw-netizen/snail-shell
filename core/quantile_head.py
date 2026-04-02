@@ -12,7 +12,6 @@ import numpy as np
 import lightgbm as lgb
 from typing import Dict, Tuple, Optional
 from dataclasses import dataclass
-import warnings
 
 
 @dataclass

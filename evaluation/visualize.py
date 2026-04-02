@@ -9,9 +9,7 @@ visualize.py - 可视化函数
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
-from typing import Dict, List, Optional, Tuple
-import warnings
+from typing import Dict, Optional, Tuple
 
 # 设置中文字体
 plt.rcParams["font.sans-serif"] = ["SimHei", "DejaVu Sans", "Arial Unicode MS"]
@@ -61,7 +59,7 @@ def plot_pareto_curve(
     fig, ax = plt.subplots(figsize=figsize)
 
     # 绘制散点图
-    scatter = ax.scatter(avg_widths, coverage_errors, s=100, alpha=0.6)
+    ax.scatter(avg_widths, coverage_errors, s=100, alpha=0.6)
 
     # 添加标签
     for i, method_name in enumerate(method_names):
@@ -336,7 +334,7 @@ def plot_spiral_trajectory(
     if alerts is not None:
         # 根据预警信号着色
         colors = ["red" if alert else "blue" for alert in alerts]
-        scatter = ax1.scatter(anchor, radius, c=colors, alpha=0.6, s=20)
+        ax1.scatter(anchor, radius, c=colors, alpha=0.6, s=20)
 
         # 添加图例
         from matplotlib.patches import Patch

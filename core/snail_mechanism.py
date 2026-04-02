@@ -334,7 +334,7 @@ if __name__ == "__main__":
     # 应用软拉回
     corrected, diagnostics = snail.apply(point_pred, anchor, radius, beta=1.0)
 
-    print(f"\nDiagnostics for β=1.0:")
+    print("\nDiagnostics for β=1.0:")
     for key, value in diagnostics.items():
         print(f"  {key}: {value:.4f}")
 

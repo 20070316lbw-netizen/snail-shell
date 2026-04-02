@@ -1,5 +1,4 @@
 import numpy as np
-import pytest
 
 from core.snail_mechanism import soft_pullback
 
