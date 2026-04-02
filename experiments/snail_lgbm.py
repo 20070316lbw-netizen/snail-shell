@@ -25,6 +25,7 @@ from evaluation.metrics import (
     winkler_score,
     interval_width,
     mean_absolute_error,
+    actual_coverage,
 )
 
 
@@ -385,6 +386,7 @@ if __name__ == "__main__":
 
         # 计算评估指标
         ce = coverage_error(y_test, lower, upper)
+        ac = actual_coverage(y_test, lower, upper)
         ws = winkler_score(y_test, lower, upper)
         iw = interval_width(lower, upper)
         mae = mean_absolute_error(y_test, point_pred)
@@ -392,6 +394,7 @@ if __name__ == "__main__":
         print(f"\n{method_name}:")
         print(f"  Beta:            {diagnostics['beta']}")
         print(f"  Mean Alpha:      {diagnostics['mean_alpha']:.4f}")
+        print(f"  Actual Coverage: {ac:.4f}")
         print(f"  Coverage Error:  {ce:.4f}")
         print(f"  Winkler Score:   {ws:.4f}")
         print(f"  Interval Width:  {iw:.4f}")

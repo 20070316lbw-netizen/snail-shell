@@ -24,6 +24,7 @@ from evaluation.metrics import (
     winkler_score,
     interval_width,
     mean_absolute_error,
+    actual_coverage,
 )
 
 
@@ -245,11 +246,11 @@ class QRBaseline:
         """
         predictions = self.quantile_head.predict(X)
 
-        # README规格：QR 的点预测来自 MSE 模型，而非 q50
-        # q50 作为点预测是 Q50-only 基线的定义，两者必须区分
+        # Baseline QR: 使用 MSE 点预测，且区间以 MSE 为中心（即 Snail-0）
         point_pred = predictions["point"]
-        lower = predictions["q10"]
-        upper = predictions["q90"]
+        radius = (predictions["q90"] - predictions["q10"]) / 2
+        lower = point_pred - radius
+        upper = point_pred + radius
 
         return point_pred, lower, upper
 
@@ -303,10 +304,11 @@ class Q50OnlyBaseline:
         """
         predictions = self.quantile_head.predict(X)
 
-        # 点预测就是q50
+        # Baseline Q50-only: 使用 q50 点预测，且区间以 q50 为中心（即 Snail-inf）
         point_pred = predictions["q50"]
-        lower = predictions["q10"]
-        upper = predictions["q90"]
+        radius = (predictions["q90"] - predictions["q10"]) / 2
+        lower = point_pred - radius
+        upper = point_pred + radius
 
         return point_pred, lower, upper
 
@@ -487,11 +489,13 @@ if __name__ == "__main__":
 
         # 计算评估指标
         ce = coverage_error(y_test, lower, upper)
+        ac = actual_coverage(y_test, lower, upper)
         ws = winkler_score(y_test, lower, upper)
         iw = interval_width(lower, upper)
         mae = mean_absolute_error(y_test, point_pred)
 
         print(f"\n{method_name}:")
+        print(f"  Actual Coverage:{ac:.4f}")
         print(f"  Coverage Error: {ce:.4f}")
         print(f"  Winkler Score:  {ws:.4f}")
         print(f"  Interval Width: {iw:.4f}")

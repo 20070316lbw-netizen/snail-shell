@@ -194,7 +194,7 @@ def _load_or_mock(ctx) -> tuple:
 def _print_table(df: pd.DataFrame, title: str = ""):
     """统一打印评估结果表格。"""
     cols_order = [
-        "Method", "coverage_error", "winkler_score", "interval_width",
+        "Method", "actual_coverage", "coverage_error", "winkler_score", "interval_width",
         "mae", "rank_ic", "composite_score",
     ]
     cols_order = [c for c in cols_order if c in df.columns]
@@ -257,6 +257,12 @@ def cmd_compare(args, ctx):
         baseline_methods=baselines,
         X_val_q2_4=Xv, y_val_q2_4=yv,
     )
+    # 重命名基线以对齐 Snail 理论框架
+    if "QR" in baseline_results:
+        baseline_results["Snail-0 (MSE-base)"] = baseline_results.pop("QR")
+    if "Q50-only" in baseline_results:
+        baseline_results["Snail-inf (Q50-base)"] = baseline_results.pop("Q50-only")
+    
     all_preds.update(baseline_results)
 
     # ── 蜗牛壳变体 ────────────────────────────────────────────────

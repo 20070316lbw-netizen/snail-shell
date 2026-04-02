@@ -42,6 +42,28 @@ def coverage_error(
     return np.abs(coverage - target_coverage)
 
 
+def actual_coverage(
+    y_true: np.ndarray,
+    lower: np.ndarray,
+    upper: np.ndarray,
+) -> float:
+    """
+    计算实际覆盖率
+
+    PICP = (1/N) * Σ I[lower ≤ y_true ≤ upper]
+
+    Args:
+        y_true: 真实值
+        lower: 区间下界
+        upper: 区间上界
+
+    Returns:
+        实际覆盖率
+    """
+    in_interval = (y_true >= lower) & (y_true <= upper)
+    return np.mean(in_interval)
+
+
 def winkler_score(
     y_true: np.ndarray, lower: np.ndarray, upper: np.ndarray, alpha: float = 0.2
 ) -> float:
@@ -224,6 +246,7 @@ def calculate_all_metrics(
     metrics = {}
 
     # 区间质量指标
+    metrics["actual_coverage"] = actual_coverage(y_true, lower, upper)
     metrics["coverage_error"] = coverage_error(y_true, lower, upper)
     metrics["winkler_score"] = winkler_score(y_true, lower, upper)
     metrics["interval_width"] = interval_width(lower, upper)
