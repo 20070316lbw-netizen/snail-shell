@@ -9,7 +9,6 @@ baseline_lgbm.py - 基线实验（Residual / CP / QR / Q50-only）
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict, Tuple, Optional
 import lightgbm as lgb
 from scipy import stats
