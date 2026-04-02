@@ -9,7 +9,6 @@ snail_lgbm.py - Snail-0.5/1/2/5 实验
 """
 
 import numpy as np
-import pandas as pd
 from typing import Dict, List, Tuple, Optional
 import sys
 import os
@@ -262,68 +261,6 @@ def select_best_beta(
     best_beta, beta_scores = snail.select_beta(point_pred, anchor, radius, y_val)
 
     return best_beta, beta_scores
-
-
-def compare_snail_variants(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-) -> pd.DataFrame:
-    """
-    比较不同蜗牛壳变体
-
-    Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
-
-    Returns:
-        比较结果DataFrame
-    """
-    beta_values = [0.5, 1.0, 2.0, 5.0]
-
-    results = run_snail_experiment(
-        X_train, y_train, X_val, y_val, X_test, y_test, beta_values
-    )
-
-    # 收集结果
-    comparison_data = []
-
-    for method_name, result in results.items():
-        point_pred = result["point_pred"]
-        lower = result["lower"]
-        upper = result["upper"]
-        diagnostics = result["diagnostics"]
-
-        # 计算评估指标
-        ce = coverage_error(y_test, lower, upper)
-        ws = winkler_score(y_test, lower, upper)
-        iw = interval_width(lower, upper)
-        mae = mean_absolute_error(y_test, point_pred)
-
-        comparison_data.append(
-            {
-                "Method": method_name,
-                "Beta": diagnostics["beta"],
-                "MAE": mae,
-                "Coverage Error": ce,
-                "Winkler Score": ws,
-                "Interval Width": iw,
-                "Mean Alpha": diagnostics["mean_alpha"],
-                "Mean Correction": diagnostics["mean_correction"],
-            }
-        )
-
-    # 创建DataFrame
-    df_comparison = pd.DataFrame(comparison_data)
-
-    return df_comparison
 
 
 if __name__ == "__main__":
