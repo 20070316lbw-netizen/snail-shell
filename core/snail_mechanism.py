@@ -133,6 +133,11 @@ class SnailMechanism:
         # 软拉回（复用已计算的 alpha，避免重复调用 calculate_alpha）
         corrected_pred = alpha * point_pred + (1 - alpha) * anchor
 
+        # ✅ 关键修复：以修正后中心点重建区间，保持原始半宽不变
+        # Snail 的语义：β 调参应同时影响点预测和区间中心，否则 Winkler/Coverage 对 β 无响应
+        corrected_q10 = corrected_pred - radius
+        corrected_q90 = corrected_pred + radius
+
         # 计算统计信息
         diagnostics = {
             "beta": beta,
@@ -146,7 +151,7 @@ class SnailMechanism:
             "mean_correction": np.mean(np.abs(corrected_pred - point_pred)),
         }
 
-        return corrected_pred, diagnostics
+        return corrected_pred, corrected_q10, corrected_q90, diagnostics
 
     def scan_beta(
         self, point_pred: np.ndarray, anchor: np.ndarray, radius: np.ndarray
@@ -165,8 +170,10 @@ class SnailMechanism:
         results = {}
 
         for beta in self.beta_values:
-            corrected_pred, diagnostics = self.apply(point_pred, anchor, radius, beta)
-            results[beta] = (corrected_pred, diagnostics)
+            corrected_pred, corrected_q10, corrected_q90, diagnostics = self.apply(
+                point_pred, anchor, radius, beta
+            )
+            results[beta] = (corrected_pred, corrected_q10, corrected_q90, diagnostics)
 
         self.results = results
         return results
@@ -202,34 +209,27 @@ class SnailMechanism:
         # 如果没有提供评分函数，使用默认的
         if scoring_func is None:
 
-            def default_scoring(y_true, pred, anchor, radius):
-                # 计算MAE
+            def default_scoring(y_true, pred, q10, q90):
                 mae = np.mean(np.abs(pred - y_true))
 
-                # 计算Coverage Error
-                q10 = anchor - radius
-                q90 = anchor + radius
+                # 使用修正后的区间计算 Coverage Error
                 coverage = np.mean((y_true >= q10) & (y_true <= q90))
-                ce = np.abs(coverage - 0.8)  # 目标覆盖率80%
+                ce = np.abs(coverage - 0.8)
 
-                # 计算Winkler Score
+                # Winkler Score（2/alpha = 2/0.2 = 10，与 evaluation/metrics.py 保持一致）
                 width = q90 - q10
                 penalty = np.where(
                     y_true < q10,
                     10 * (q10 - y_true),
                     np.where(y_true > q90, 10 * (y_true - q90), 0),
                 )
-                winkler = width + penalty
-                winkler_mean = np.mean(winkler)
+                winkler_mean = np.mean(width + penalty)
 
-                # 复合指标
                 score = winkler_mean + 10 * max(0, ce - 0.05)
                 return {
-                    "score": score,
-                    "mae": mae,
+                    "score": score, "mae": mae,
                     "winkler_mean": winkler_mean,
-                    "coverage_error": ce,
-                    "coverage": coverage,
+                    "coverage_error": ce, "coverage": coverage,
                 }
 
             scoring_func = default_scoring
@@ -239,10 +239,12 @@ class SnailMechanism:
 
         # 评估每个β
         beta_scores = {}
-        for beta, (corrected_pred, diagnostics) in scan_results.items():
-            metrics = scoring_func(y_true, corrected_pred, anchor, radius)
+        for beta, (corrected_pred, corrected_q10, corrected_q90, diagnostics) in scan_results.items():
+            metrics = scoring_func(y_true, corrected_pred, corrected_q10, corrected_q90)
             beta_scores[beta] = {
                 "corrected_pred": corrected_pred,
+                "corrected_q10": corrected_q10,
+                "corrected_q90": corrected_q90,
                 "diagnostics": diagnostics,
                 "metrics": metrics,
             }
@@ -318,7 +320,7 @@ if __name__ == "__main__":
     snail = SnailMechanism()
 
     # 应用软拉回
-    corrected, diagnostics = snail.apply(point_pred, anchor, radius, beta=1.0)
+    corrected, corrected_q10, corrected_q90, diagnostics = snail.apply(point_pred, anchor, radius, beta=1.0)
 
     print("\nDiagnostics for β=1.0:")
     for key, value in diagnostics.items():
@@ -329,7 +331,7 @@ if __name__ == "__main__":
     scan_results = snail.scan_beta(point_pred, anchor, radius)
 
     for beta in snail.beta_values:
-        _, diag = scan_results[beta]
+        _, _, _, diag = scan_results[beta]
         print(
             f"  β={beta}: mean_alpha={diag['mean_alpha']:.4f}, "
             f"mean_correction={diag['mean_correction']:.4f}"
