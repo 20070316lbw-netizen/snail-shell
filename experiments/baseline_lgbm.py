@@ -19,7 +19,7 @@ import os
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.quantile_head import QuantileHead
+from core.quantile_head import QuantileHead, FitConfig
 from evaluation.metrics import (
     coverage_error,
     winkler_score,
@@ -216,7 +216,8 @@ class QRBaseline:
             X_val: 验证特征
             y_val: 验证标签
         """
-        self.quantile_head.fit(X_train, y_train, X_val, y_val)
+        config = FitConfig(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+        self.quantile_head.fit(config)
 
     def predict_interval(
         self, X: np.ndarray
@@ -276,7 +277,8 @@ class Q50OnlyBaseline:
             X_val: 验证特征
             y_val: 验证标签
         """
-        self.quantile_head.fit(X_train, y_train, X_val, y_val)
+        config = FitConfig(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+        self.quantile_head.fit(config)
 
     def predict_interval(
         self, X: np.ndarray

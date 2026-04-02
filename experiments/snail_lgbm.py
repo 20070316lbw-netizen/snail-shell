@@ -17,7 +17,7 @@ import os
 # 添加项目根目录到路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from core.quantile_head import QuantileHead
+from core.quantile_head import QuantileHead, FitConfig
 from core.snail_mechanism import SnailMechanism
 from evaluation.metrics import (
     coverage_error,
@@ -85,7 +85,8 @@ class SnailModel:
             y_val: 验证标签
         """
         # 训练分位数回归头
-        self.quantile_head.fit(X_train, y_train, X_val, y_val)
+        config = FitConfig(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+        self.quantile_head.fit(config)
         self.is_fitted = True
 
     def predict(self, X: np.ndarray) -> Dict[str, np.ndarray]:
@@ -247,7 +248,8 @@ def select_best_beta(
 
     # 先训练分位数回归头（所有β共享）
     qh = QuantileHead()
-    qh.fit(X_train, y_train, X_val, y_val)
+    config = FitConfig(X_train=X_train, y_train=y_train, X_val=X_val, y_val=y_val)
+    qh.fit(config)
 
     # 获取锚点和半径
     anchor, radius = qh.predict_anchor_and_radius(X_val)
