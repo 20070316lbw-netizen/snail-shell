@@ -93,44 +93,6 @@ class DataLoader:
         df = self.conn.execute(query, params).fetchdf()
         return df
 
-    def get_prices(
-        self,
-        ticker: Optional[str] = None,
-        start_date: Optional[date] = None,
-        end_date: Optional[date] = None,
-    ) -> pd.DataFrame:
-        """
-        获取价格数据
-
-        Args:
-            ticker: 股票代码（可选）
-            start_date: 开始日期（可选）
-            end_date: 结束日期（可选）
-
-        Returns:
-            价格数据DataFrame
-        """
-        if not self.conn:
-            self.connect()
-
-        query = "SELECT * FROM prices_cn WHERE 1=1"
-        params = []
-
-        if ticker:
-            query += " AND ticker = ?"
-            params.append(ticker)
-        if start_date:
-            query += " AND date >= ?"
-            params.append(start_date)
-        if end_date:
-            query += " AND date <= ?"
-            params.append(end_date)
-
-        query += " ORDER BY date, ticker"
-
-        df = self.conn.execute(query, params).fetchdf()
-        return df
-
     def get_news_sentiment(
         self,
         ticker: Optional[str] = None,
