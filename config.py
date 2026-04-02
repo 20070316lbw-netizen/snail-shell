@@ -4,14 +4,13 @@ config.py - 项目配置文件
 包含项目路径、数据库配置等
 """
 
-import os
 from pathlib import Path
 
 # 项目根目录
 PROJECT_ROOT = Path(__file__).parent
 
 # 数据库路径
-DATABASE_PATH = os.path.join(os.path.dirname(__file__), "QQ_Quant_DB", "quant_lab.duckdb")
+DATABASE_PATH = PROJECT_ROOT / "QQ_Quant_DB" / "quant_lab.duckdb"
 
 # 数据目录
 DATA_DIR = PROJECT_ROOT / "data"
