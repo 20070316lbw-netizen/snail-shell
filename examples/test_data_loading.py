@@ -77,10 +77,10 @@ def main():
             # 按S/P比率排序
             sorted_df = all_features.sort_values("sp_ratio", ascending=False)
             print("\n  S/P比率最高的5只股票:")
-            for _, row in sorted_df.head().iterrows():
+            for row in sorted_df.head().itertuples(index=False):
                 print(
-                    f"    {row['ticker']}: S/P={row['sp_ratio']:.4f}, "
-                    f"20日动量={row['mom_20d']:.4f}"
+                    f"    {row.ticker}: S/P={row.sp_ratio:.4f}, "
+                    f"20日动量={row.mom_20d:.4f}"
                 )
 
         # 4. 获取新闻情感数据
