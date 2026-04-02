@@ -17,6 +17,7 @@ from dataclasses import dataclass
 @dataclass
 class FitConfig:
     """训练配置类"""
+
     X_train: np.ndarray
     y_train: np.ndarray
     X_val: Optional[np.ndarray] = None

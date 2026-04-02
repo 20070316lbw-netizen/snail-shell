@@ -1,6 +1,7 @@
 import numpy as np
 from core.quantile_head import pinball_loss
 
+
 def test_pinball_loss_basic():
     """Test basic pinball loss calculation for arrays"""
     y_true = np.array([1.0, 2.0, 3.0])

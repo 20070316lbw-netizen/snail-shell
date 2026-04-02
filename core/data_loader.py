@@ -9,7 +9,7 @@ import pandas as pd
 import numpy as np
 from typing import List, Optional, Tuple
 from datetime import date
-import os
+from pathlib import Path
 
 
 class DataLoader:
@@ -31,9 +31,9 @@ class DataLoader:
 
     def connect(self) -> None:
         """连接数据库"""
-        if not os.path.exists(self.db_path):
+        if not Path(self.db_path).exists():
             raise FileNotFoundError(f"数据库文件不存在: {self.db_path}")
-        self.conn = duckdb.connect(self.db_path, read_only=True)
+        self.conn = duckdb.connect(str(self.db_path), read_only=True)
 
     def close(self) -> None:
         """关闭数据库连接"""
@@ -281,7 +281,8 @@ class DataLoader:
                 params.append(index_group)
 
         if limit:
-            query += f" LIMIT {limit}"
+            query += " LIMIT ?"
+            params.append(limit)
 
         result = self.conn.execute(query, params).fetchall()
         return [row[0] for row in result]

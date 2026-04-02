@@ -11,13 +11,15 @@ snail_mechanism.py - 可信圆 + 软拉回机制（β 控制）
 """
 
 import sys
-import os
+from pathlib import Path
 import numpy as np
 from typing import Tuple, Dict, Optional
 
 # 将项目根目录加入 sys.path，确保从任意工作目录调用时都能正确导入
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from evaluation.metrics import crossing_rate  # 统一维护于 evaluation/metrics.py，此处不重复定义
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from evaluation.metrics import (
+    crossing_rate,
+)  # 统一维护于 evaluation/metrics.py，此处不重复定义
 
 
 def soft_pullback(
@@ -75,7 +77,6 @@ def calculate_alpha(
         alpha = np.exp(-beta * deviation)
 
     return alpha
-
 
 
 class SnailMechanism:
@@ -227,9 +228,11 @@ class SnailMechanism:
 
                 score = winkler_mean + 10 * max(0, ce - 0.05)
                 return {
-                    "score": score, "mae": mae,
+                    "score": score,
+                    "mae": mae,
                     "winkler_mean": winkler_mean,
-                    "coverage_error": ce, "coverage": coverage,
+                    "coverage_error": ce,
+                    "coverage": coverage,
                 }
 
             scoring_func = default_scoring
@@ -239,7 +242,12 @@ class SnailMechanism:
 
         # 评估每个β
         beta_scores = {}
-        for beta, (corrected_pred, corrected_q10, corrected_q90, diagnostics) in scan_results.items():
+        for beta, (
+            corrected_pred,
+            corrected_q10,
+            corrected_q90,
+            diagnostics,
+        ) in scan_results.items():
             metrics = scoring_func(y_true, corrected_pred, corrected_q10, corrected_q90)
             beta_scores[beta] = {
                 "corrected_pred": corrected_pred,
@@ -320,7 +328,9 @@ if __name__ == "__main__":
     snail = SnailMechanism()
 
     # 应用软拉回
-    corrected, corrected_q10, corrected_q90, diagnostics = snail.apply(point_pred, anchor, radius, beta=1.0)
+    corrected, corrected_q10, corrected_q90, diagnostics = snail.apply(
+        point_pred, anchor, radius, beta=1.0
+    )
 
     print("\nDiagnostics for β=1.0:")
     for key, value in diagnostics.items():

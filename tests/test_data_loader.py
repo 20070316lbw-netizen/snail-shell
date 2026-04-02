@@ -3,9 +3,10 @@ import os
 import sys
 
 # Add the project root directory to the Python path to import core modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.data_loader import DataLoader
+
 
 def test_connect_missing_database_file_raises_error():
     """Test that connecting to a non-existent database file raises a FileNotFoundError."""

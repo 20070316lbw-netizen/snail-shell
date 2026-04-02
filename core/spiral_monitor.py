@@ -143,7 +143,9 @@ def rolling_alert(
         # 判断是否预警
         # 我们只在 [window, n) 范围内比较，避免 NaN 带来的 RuntimeWarning
         mask = np.zeros(n, dtype=bool)
-        mask[window:] = velocity[window:] > (mu[window:] + threshold_sigma * sigma[window:])
+        mask[window:] = velocity[window:] > (
+            mu[window:] + threshold_sigma * sigma[window:]
+        )
         alerts[mask] = 1
 
     return alerts

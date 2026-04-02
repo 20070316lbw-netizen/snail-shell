@@ -2,6 +2,7 @@ import numpy as np
 
 from core.snail_mechanism import soft_pullback
 
+
 def test_soft_pullback_basic():
     """Test basic mathematical correctness of the soft pullback mechanism."""
     point_pred = np.array([1.0, -1.0])
@@ -29,6 +30,7 @@ def test_soft_pullback_basic():
 
     np.testing.assert_allclose(result, expected)
 
+
 def test_soft_pullback_beta_zero():
     """Test with beta=0, which should return exactly point_pred (no pullback)."""
     point_pred = np.array([2.0, 3.0, 4.0])
@@ -42,6 +44,7 @@ def test_soft_pullback_beta_zero():
     result = soft_pullback(point_pred, anchor, radius, beta)
 
     np.testing.assert_allclose(result, point_pred)
+
 
 def test_soft_pullback_beta_inf():
     """Test with beta=np.inf, which should return exactly anchor (full pullback)."""
@@ -57,6 +60,7 @@ def test_soft_pullback_beta_inf():
 
     np.testing.assert_allclose(result, anchor)
 
+
 def test_soft_pullback_zero_radius():
     """Test with zero radius, should be handled by epsilon."""
     point_pred = np.array([2.0])
@@ -71,6 +75,7 @@ def test_soft_pullback_zero_radius():
     result = soft_pullback(point_pred, anchor, radius, beta)
 
     np.testing.assert_allclose(result, anchor, atol=1e-7)
+
 
 def test_soft_pullback_negative_radius():
     """Test with negative radius, should also be handled by epsilon."""
@@ -88,6 +93,7 @@ def test_soft_pullback_negative_radius():
     result = soft_pullback(point_pred, anchor, radius, beta)
 
     np.testing.assert_allclose(result, anchor, atol=1e-7)
+
 
 def test_soft_pullback_identical_predictions():
     """Test when point_pred and anchor are identical."""

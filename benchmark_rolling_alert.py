@@ -12,7 +12,9 @@ threshold_sigma = 2.0
 
 # Benchmark current implementation
 start_time = time.time()
-alerts_original = rolling_alert(velocity, window=window, threshold_sigma=threshold_sigma)
+alerts_original = rolling_alert(
+    velocity, window=window, threshold_sigma=threshold_sigma
+)
 original_time = time.time() - start_time
 
 print(f"Original implementation time: {original_time:.4f} seconds")

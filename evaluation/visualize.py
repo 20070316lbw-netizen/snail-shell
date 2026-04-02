@@ -75,7 +75,9 @@ def plot_pareto_curve(
     # 设置图形属性
     ax.set_xlabel("平均区间宽度", fontsize=12)
     ax.set_ylabel("Coverage Error", fontsize=12)
-    ax.set_title("Pareto曲线: Coverage Error vs 区间宽度", fontsize=14, fontweight="bold")
+    ax.set_title(
+        "Pareto曲线: Coverage Error vs 区间宽度", fontsize=14, fontweight="bold"
+    )
     ax.grid(True, alpha=0.3)
     ax.legend()
 

@@ -2,13 +2,14 @@ import numpy as np
 import warnings
 from evaluation.metrics import coverage_error
 
+
 class TestCoverageError:
     def test_perfect_coverage(self):
         """Test when actual coverage exactly matches target coverage."""
         # 10 samples, 8 inside -> 0.8 coverage
         y_true = np.array([5, 5, 5, 5, 5, 5, 5, 5, 0, 10])
-        lower = np.array([2]*10)
-        upper = np.array([8]*10)
+        lower = np.array([2] * 10)
+        upper = np.array([8] * 10)
 
         # Expected CE = |0.8 - 0.8| = 0.0
         ce = coverage_error(y_true, lower, upper, target_coverage=0.8)
@@ -18,8 +19,8 @@ class TestCoverageError:
         """Test when actual coverage is less than target coverage."""
         # 10 samples, 5 inside -> 0.5 coverage
         y_true = np.array([5, 5, 5, 5, 5, 0, 0, 0, 10, 10])
-        lower = np.array([2]*10)
-        upper = np.array([8]*10)
+        lower = np.array([2] * 10)
+        upper = np.array([8] * 10)
 
         # Expected CE = |0.5 - 0.8| = 0.3
         ce = coverage_error(y_true, lower, upper, target_coverage=0.8)
@@ -28,9 +29,9 @@ class TestCoverageError:
     def test_over_coverage(self):
         """Test when actual coverage is greater than target coverage."""
         # 10 samples, 10 inside -> 1.0 coverage
-        y_true = np.array([5]*10)
-        lower = np.array([2]*10)
-        upper = np.array([8]*10)
+        y_true = np.array([5] * 10)
+        lower = np.array([2] * 10)
+        upper = np.array([8] * 10)
 
         # Expected CE = |1.0 - 0.8| = 0.2
         ce = coverage_error(y_true, lower, upper, target_coverage=0.8)
@@ -39,9 +40,9 @@ class TestCoverageError:
     def test_different_target_coverage(self):
         """Test with a custom target coverage."""
         # 10 samples, 9 inside -> 0.9 coverage
-        y_true = np.array([5]*9 + [10])
-        lower = np.array([2]*10)
-        upper = np.array([8]*10)
+        y_true = np.array([5] * 9 + [10])
+        lower = np.array([2] * 10)
+        upper = np.array([8] * 10)
 
         # Target coverage = 0.9
         # Expected CE = |0.9 - 0.9| = 0.0
@@ -74,8 +75,8 @@ class TestCoverageError:
         """Test when actual coverage is 0."""
         # 10 samples, 0 inside -> 0.0 coverage
         y_true = np.array([0, 10, 0, 10, 0, 10, 0, 10, 0, 10])
-        lower = np.array([2]*10)
-        upper = np.array([8]*10)
+        lower = np.array([2] * 10)
+        upper = np.array([8] * 10)
 
         # Expected CE = |0.0 - 0.8| = 0.8
         ce = coverage_error(y_true, lower, upper, target_coverage=0.8)

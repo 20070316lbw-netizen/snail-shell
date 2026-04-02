@@ -11,15 +11,15 @@ snail_lgbm.py - Snail-0.5/1/2/5 实验
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional
-from dataclasses import dataclass
 import sys
-import os
+from pathlib import Path
 
 # 添加项目根目录到路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from core.quantile_head import QuantileHead, FitConfig
 from core.snail_mechanism import SnailMechanism
+from core.experiment_data import ExperimentData
 from evaluation.metrics import (
     coverage_error,
     winkler_score,
@@ -111,8 +111,8 @@ class SnailModel:
 
         # 应用软拉回（只调用一次）
         point_pred = predictions["point"]
-        corrected_pred, corrected_q10, corrected_q90, diagnostics = self.snail_mechanism.apply(
-            point_pred, anchor, radius, self.beta
+        corrected_pred, corrected_q10, corrected_q90, diagnostics = (
+            self.snail_mechanism.apply(point_pred, anchor, radius, self.beta)
         )
 
         # 合并结果
@@ -121,9 +121,9 @@ class SnailModel:
             "corrected_point": corrected_pred,
             "anchor": anchor,
             "radius": radius,
-            "q10": corrected_q10,    # ✅ 修正后的区间下界（以 corrected_pred 为中心，半宽 = radius）
-            "q90": corrected_q90,    # ✅ 修正后的区间上界
-            "raw_q10": predictions["q10"],   # 原始分位数（保留备查）
+            "q10": corrected_q10,  # ✅ 修正后的区间下界（以 corrected_pred 为中心，半宽 = radius）
+            "q90": corrected_q90,  # ✅ 修正后的区间上界
+            "raw_q10": predictions["q10"],  # 原始分位数（保留备查）
             "raw_q90": predictions["q90"],
             "alpha": diagnostics["mean_alpha"],
             "diagnostics": diagnostics,
@@ -152,31 +152,19 @@ class SnailModel:
         return point_pred, lower, upper
 
 
-@dataclass
-class ExperimentConfig:
-    """实验配置数据类"""
-    X_train: np.ndarray
-    y_train: np.ndarray
-    X_val: np.ndarray
-    y_val: np.ndarray
-    X_test: np.ndarray
-    y_test: np.ndarray
-    beta_values: Optional[List[float]] = None
-    X_val_q2_4: Optional[np.ndarray] = None
-    y_val_q2_4: Optional[np.ndarray] = None
-
-
-def run_snail_experiment(config: ExperimentConfig) -> Dict:
+def run_snail_experiment(
+    data: ExperimentData, beta_values: Optional[List[float]] = None
+) -> Dict:
     """
     运行蜗牛壳实验
 
     Args:
-        config: 实验配置数据类
+        data: 实验数据
+        beta_values: 实验用的beta列表
 
     Returns:
         实验结果字典
     """
-    beta_values = config.beta_values
     if beta_values is None:
         beta_values = [0.5, 1.0, 2.0, 5.0]
 
@@ -187,10 +175,10 @@ def run_snail_experiment(config: ExperimentConfig) -> Dict:
 
         # 创建并训练模型
         model = SnailModel(beta=beta)
-        model.fit(config.X_train, config.y_train, config.X_val, config.y_val)
+        model.fit(data.X_train, data.y_train, data.X_val, data.y_val)
 
         # 预测
-        predictions = model.predict(config.X_test)
+        predictions = model.predict(data.X_test)
         point_pred = predictions["corrected_point"]
         lower = predictions["q10"]
         upper = predictions["q90"]
@@ -205,8 +193,8 @@ def run_snail_experiment(config: ExperimentConfig) -> Dict:
             "diagnostics": predictions["diagnostics"],
         }
 
-        if config.X_val_q2_4 is not None and config.y_val_q2_4 is not None:
-            v_predictions = model.predict(config.X_val_q2_4)
+        if data.X_val_q2_4 is not None and data.y_val_q2_4 is not None:
+            v_predictions = model.predict(data.X_val_q2_4)
             result_dict["val_q2_4"] = {
                 "point_pred": v_predictions["corrected_point"],
                 "lower": v_predictions["q10"],
@@ -266,40 +254,19 @@ def select_best_beta(
     return best_beta, beta_scores
 
 
-def compare_snail_variants(
-    X_train: np.ndarray,
-    y_train: np.ndarray,
-    X_val: np.ndarray,
-    y_val: np.ndarray,
-    X_test: np.ndarray,
-    y_test: np.ndarray,
-) -> pd.DataFrame:
+def compare_snail_variants(data: ExperimentData) -> pd.DataFrame:
     """
     比较不同蜗牛壳变体
 
     Args:
-        X_train: 训练特征
-        y_train: 训练标签
-        X_val: 验证特征
-        y_val: 验证标签
-        X_test: 测试特征
-        y_test: 测试标签
+        data: 实验数据
 
     Returns:
         比较结果DataFrame
     """
     beta_values = [0.5, 1.0, 2.0, 5.0]
 
-    config = ExperimentConfig(
-        X_train=X_train,
-        y_train=y_train,
-        X_val=X_val,
-        y_val=y_val,
-        X_test=X_test,
-        y_test=y_test,
-        beta_values=beta_values
-    )
-    results = run_snail_experiment(config)
+    results = run_snail_experiment(data, beta_values=beta_values)
 
     # 收集结果
     comparison_data = []
@@ -364,15 +331,15 @@ if __name__ == "__main__":
 
     # 运行蜗牛壳实验
     print("\nRunning Snail experiments...")
-    config = ExperimentConfig(
+    data = ExperimentData(
         X_train=X_train,
         y_train=y_train,
         X_val=X_val,
         y_val=y_val,
         X_test=X_test,
-        y_test=y_test
+        y_test=y_test,
     )
-    results = run_snail_experiment(config)
+    results = run_snail_experiment(data)
 
     # 评估结果
     print("\nSnail Experiment Results:")
