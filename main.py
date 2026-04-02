@@ -144,13 +144,9 @@ def _print_results_table(df: pd.DataFrame):
     cols_order = [c for c in cols_order if c in df.columns]
     df_show = df[cols_order].copy()
 
-    float_cols = [c for c in df_show.columns if c != "Method"]
-    for c in float_cols:
-        df_show[c] = df_show[c].map(lambda x: f"{x:.4f}" if pd.notna(x) else "N/A")
-
     sep = "─" * 110
     print(f"\n{sep}")
-    print(df_show.to_string(index=False))
+    print(df_show.to_string(index=False, na_rep="N/A", float_format=lambda x: f"{x:.4f}"))
     print(sep)
 
 
