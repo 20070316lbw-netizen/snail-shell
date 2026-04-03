@@ -1,4 +1,6 @@
 # 🐌 snail-shell
+This repository accompanies the paper:
+"GSPQR: A Geometric Soft-Pullback Mechanism for Quantile Interval Prediction in A-Share Markets"
 
 > A股日频收益率区间预测框架，基于 LightGBM 分位数回归与软拉回机制
 
