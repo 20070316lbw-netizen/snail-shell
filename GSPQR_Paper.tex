@@ -47,11 +47,13 @@ shows that GSPQR achieves a Winkler Score of 0.4784, a 5.9\% improvement over En
 ($t = -68.5$, $p \ll 0.001$), while reducing interval width by 17.0\%. The $\beta$
 parameter traces a convex Pareto frontier between calibration and cross-sectional
 ranking ability, identifying an optimal balance at $\beta^* = 1.0$ under
-regime-shift-intensive conditions.
+regime-shift-intensive market conditions.
 \end{abstract}
 
 \textbf{Keywords:} quantile regression, interval prediction, conformal prediction,
-LightGBM, A-share market, uncertainty quantification
+LightGBM, A-share market, uncertainty quantification\\
+
+\textbf{JEL Classification:} C53, C58, G17, G32
 
 \hrule
 \vspace{1em}
@@ -107,6 +109,14 @@ optimizing placement. We make the following contributions:
     EnbPI ($t = -68.5$, $p \ll 0.001$) and a 0.86\% MAE reduction relative to the
     MSE-center baseline despite no direct MSE optimization.
 \end{enumerate}
+
+\paragraph{Code Availability.}
+The implementation of GSPQR and all experiment scripts are publicly available at:
+\url{https://github.com/20070316lbw-netizen/snail-shell.git}.
+
+\paragraph{Code Availability.}
+The implementation of GSPQR, including data processing, model training, and evaluation pipelines, is publicly available at:
+\url{https://github.com/20070316lbw-netizen/snail-shell.git}.
 
 The remainder of the paper is organized as follows. Section~2 reviews related work.
 Section~3 presents the GSPQR methodology. Section~4 reports experimental results.
@@ -206,6 +216,9 @@ and confidence radius $r_t = \frac{1}{2}(\hat{q}_{0.9,t} - \hat{q}_{0.1,t})$.
 A fourth LightGBM model trained under MSE produces the conditional mean estimate
 $\hat{y}_t$. All four models share the same feature set, normalized via rolling
 Z-score with a 60-day window.
+
+All base predictors are trained independently for each configuration, 
+yielding stable and consistent results across different $\beta$ settings.
 
 \subsection{Interpretation as Adaptive Center Estimation}
 
@@ -502,6 +515,17 @@ point prediction is suboptimal in cross-sectional equity settings. GSPQR provide
 lightweight, interpretable bridge between the two with no increase in model complexity.
 Future work will explore asymmetric interval extensions, integration with deep sequence
 models, and evaluation across broader A-share universes.
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\section*{Acknowledgements}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+The author acknowledges the assistance of multiple large language models in the development and refinement of this work.This work was supported by AI-assisted research tools, including ChatGPT, Claude, Gemini, and GLM, which contributed to idea exploration, code review, and writing refinement.
+
+In particular, ChatGPT (OpenAI), Claude (Anthropic), Gemini (Google DeepMind), and GLM (Zhipu AI) were used as interactive research assistants for idea clarification, language polishing, structural feedback, and preliminary code/proof checking.
+
+All core methodological design, experimental implementation, and final academic judgments remain the sole responsibility of the author.
 
 \bibliographystyle{apalike}
 \bibliography{references}
