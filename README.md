@@ -2,239 +2,244 @@
 
 > A股日频收益率区间预测框架，基于 LightGBM 分位数回归与软拉回机制
 
----
-
-## 项目概述
-
 **snail-shell** 是一个针对A股日频数据的区间预测系统。核心创新是**软拉回机制**：用分位数回归输出的不确定性半径，动态约束点预测的偏离程度，防止模型在高波动、regime 切换时产生极端预测。
 
 锚点轨迹在特征空间中呈现出近似对数螺线的形态（观察结论，非先验假设），外扩速度作为模型失效的几何预警指标，项目因此得名。
 
-**基座模型**：LightGBM（四个独立模型）  
-**预测目标**：未来 $h=1$ 日收益率（规划扩展至 $h \in \{1, 5, 10\}$）  
-**数据**：A股日频数据
+---
+
+## 目录结构概要
+
+- **`core/`**: 核心算法实现模块，包括特征加载、分位数回归头、软拉回机制和螺旋监控器。
+- **`evaluation/`**: 评估模块，包括用于计算区间质量、点预测质量和复合评分等数学指标的 `metrics.py`，以及可视化组件 `visualize.py`。
+- **`experiments/`**: 实验脚本模块，负责执行基准方法（如残差法、Conformal Prediction）和 Snail 软拉回机制变体的训练与测试流程。
+- **`examples/`**: 存放示例代码（如测试数据加载 `test_data_loading.py` 等）。
+- **`notes/`**: 存放相关的文档笔记，例如数学推导记录。
+- **`tests/`**: 用于测试代码（当前为空）。
 
 ---
 
-## 核心机制
+## 数学实现与对应代码
 
-### 第一层：四模型输出
+本章节按照仓库代码为标准，详细介绍各核心机制的数学推导，并提供对应的 Python 代码实现。
 
-训练四个独立的 LightGBM 模型，共享输入特征：
+### 1. Pinball Loss (分位数回归)
 
-| 模型 | objective | alpha | 输出 | 用途 |
-|---|---|---|---|---|
-| 点预测器 | `regression` | — | $\hat{y}_t$ | 软拉回的被拉对象 |
-| 分位数 q10 | `quantile` | 0.1 | $\hat{y}_{q_{10},t}$ | 区间下界 |
-| 分位数 q50 | `quantile` | 0.5 | $\hat{y}_{q_{50},t}$ | 锚点 $a_t$ |
-| 分位数 q90 | `quantile` | 0.9 | $\hat{y}_{q_{90},t}$ | 区间上界 |
-
-损失函数（Pinball Loss）：
-
+**数学公式：**
 $$\mathcal{L}_q(y, \hat{y}) = \max\left(q(y-\hat{y}),\ (q-1)(y-\hat{y})\right)$$
 
-### 第二层：可信圆
+**代码实现：** (`core/quantile_head.py` & `evaluation/metrics.py`)
+```python
+def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> float:
+    """
+    计算Pinball Loss（分位数回归损失函数）
 
-$$a_t = \hat{y}_{q_{50},t}, \qquad r_t = \frac{\hat{y}_{q_{90},t} - \hat{y}_{q_{10},t}}{2}$$
+    公式: L_q(y, ŷ) = max(q*(y-ŷ), (q-1)*(y-ŷ))
+    """
+    residual = y_true - y_pred
+    return np.mean(np.maximum(alpha * residual, (alpha - 1) * residual))
+```
+
+### 2. 可信圆（锚点与半径）
+
+利用10%、50%和90%分位数的预测值，可以构建可信圆：
+
+**数学公式：**
+$$a_t = \hat{y}_{q_{50},t}$$
+$$r_t = \frac{\hat{y}_{q_{90},t} - \hat{y}_{q_{10},t}}{2}$$
 
 - $a_t$：锚点，代表预测的中心趋势
 - $r_t$：可信圆半径，代表模型的不确定性
 
-### 第三层：软拉回机制（核心）
+**代码实现：** (`core/quantile_head.py`)
+```python
+    def predict_anchor_and_radius(self, X: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        预测锚点和可信圆半径
 
-$$\alpha_t = \exp\left(-\beta \cdot \frac{|\hat{y}_t - a_t|}{r_t}\right)$$
+        锚点: a_t = ŷ_{q50,t}
+        半径: r_t = (ŷ_{q90,t} - ŷ_{q10,t}) / 2
+        """
+        predictions = self.predict(X)
 
+        anchor = predictions["q50"]
+        radius = (predictions["q90"] - predictions["q10"]) / 2
+
+        return anchor, radius
+```
+
+### 3. 软拉回机制
+
+动态调整点预测结果 $\hat{y}_t$，受制于不确定性半径和控制参数 $\beta$。
+
+**数学公式：**
+$$\alpha_t = \begin{cases} \mathbf{1}\left[\frac{|\hat{y}_t - a_t|}{r_t} == 0\right], & \text{if } \beta = \infty \\ \exp\left(-\beta \cdot \frac{|\hat{y}_t - a_t|}{r_t}\right), & \text{otherwise} \end{cases}$$
 $$\hat{y}_t^* = \alpha_t \cdot \hat{y}_t + (1 - \alpha_t) \cdot a_t$$
 
-$\beta$ 是插值控制器，控制拉回强度：
+**代码实现：** (`core/snail_mechanism.py`)
+```python
+def calculate_alpha(
+    point_pred: np.ndarray, anchor: np.ndarray, radius: np.ndarray, beta: float = 1.0
+) -> np.ndarray:
+    epsilon = 1e-8
+    radius_safe = np.maximum(radius, epsilon)
+    deviation = np.abs(point_pred - anchor) / radius_safe
 
-| $\beta$ | $\alpha_t$（偏离 $= r_t$） | $\alpha_t$（偏离 $= 2r_t$） | 行为 | 角色 |
-|---|---|---|---|---|
-| $0$ | 1.000 | 1.000 | 完全不拉回 | 对照组（退化纯 QR） |
-| $0.5$ | 0.607 | 0.368 | 温和拉回 | Snail-0.5 |
-| $1$ | 0.368 | 0.135 | 标准拉回 | Snail-1 |
-| $2$ | 0.135 | 0.018 | 强拉回 | Snail-2 |
-| $5$ | 0.007 | 0.000 | 近似截断 | Snail-5 |
-| $\infty$ | 0.000 | 0.000 | 完全拉回 | 对照组（退化纯 q50） |
+    # β=∞ 时应完全拉回（α=0），但 deviation==0（点预测 == 锚点）时不需拉回（α=1）
+    if np.isinf(beta):
+        alpha = np.where(deviation == 0.0, 1.0, 0.0)
+    else:
+        alpha = np.exp(-beta * deviation)
 
-### 第四层：螺旋监控
+    return alpha
 
-将二维锚点 $\mathbf{p}_t = (a_t, r_t)$ 投影到极坐标，拟合对数螺线：
+def soft_pullback(
+    point_pred: np.ndarray, anchor: np.ndarray, radius: np.ndarray, beta: float = 1.0
+) -> np.ndarray:
+    # 计算α_t
+    alpha = calculate_alpha(point_pred, anchor, radius, beta)
 
+    # 软拉回
+    corrected_pred = alpha * point_pred + (1 - alpha) * anchor
+
+    return corrected_pred
+```
+
+### 4. 螺旋监控 (Logarithmic Spiral)
+
+将二维锚点 $\mathbf{p}_t = (a_t, r_t)$ 投影到极坐标，拟合对数螺线。
+
+#### 极坐标转换与螺线方程
+**数学公式：**
+$$\rho_t = \sqrt{a_t^2 + r_t^2}$$
+$$\theta_t = \text{arctan2}(r_t, a_t)$$
 $$\log \rho_t = \log A + B\theta_t$$
 
-外扩速度：
+**代码实现：** (`core/spiral_monitor.py`)
+```python
+def cartesian_to_polar(a: np.ndarray, r: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    rho = np.sqrt(a**2 + r**2)
+    theta = np.arctan2(r, a)
+    return rho, theta
 
+def log_spiral_model(theta: np.ndarray, log_A: float, B: float) -> np.ndarray:
+    return log_A + B * theta
+```
+
+#### 外扩速度
+**数学公式：**
 $$v_t = \frac{\rho_t - \rho_{t-1}}{\theta_t - \theta_{t-1} + \epsilon}$$
 
-失效预警（滚动窗口 $W=60$）：
+**代码实现：** (`core/spiral_monitor.py`)
+```python
+def calculate_expansion_velocity(
+    rho: np.ndarray, theta: np.ndarray, epsilon: float = 1e-8
+) -> np.ndarray:
+    if len(rho) < 2:
+        return np.array([])
+    delta_rho = np.diff(rho)
+    delta_theta = np.diff(theta)
+    velocity = delta_rho / (delta_theta + epsilon)
+    return velocity
+```
 
-$$\text{Alert}_t = \mathbf{1}\left[v_t > \mu_{v,t} + 2\sigma_{v,t}\right]$$
+#### 失效预警
+滚动窗口计算：
+**数学公式：**
+$$\text{Alert}_t = \mathbf{1}\left[v_t > \mu_{v,t} + \text{threshold\_sigma} \cdot \sigma_{v,t}\right]$$
 
-> **定位声明**：螺旋监控目前是**事后归因工具**，$R^2$ 和外扩速度作为观察变量报告，不作为实时交易信号。螺线形态为观察结论而非先验假设，若 $R^2 < 0.5$ 如实记录。
+**代码实现：** (`core/spiral_monitor.py`)
+```python
+def rolling_alert(
+    velocity: np.ndarray, window: int = 60, threshold_sigma: float = 2.0
+) -> np.ndarray:
+    n = len(velocity)
+    alerts = np.zeros(n)
+    if n > window:
+        vel_series = pd.Series(velocity)
+        rolling_window = vel_series.shift(1).rolling(window=window)
+        mu = rolling_window.mean().to_numpy()
+        sigma = rolling_window.std(ddof=0).to_numpy()
 
----
+        mask = np.zeros(n, dtype=bool)
+        mask[window:] = velocity[window:] > (mu[window:] + threshold_sigma * sigma[window:])
+        alerts[mask] = 1
+    return alerts
+```
 
-## 数据规格
+### 5. 评估指标体系
 
-**输入特征** $\mathbf{x}_t \in \mathbb{R}^d$：
+评估分为区间质量指标与点预测质量指标。
 
-- 过去 $T=20$ 天收益率序列
-- 成交量变化率
-- 动量因子（5日、20日）
+#### 5.1 Coverage Error (CE)
+**数学公式：**
+$$\text{CE} = \left|\frac{1}{N}\sum_{t=1}^N \mathbf{1}[q_{10,t} \leq y_t \leq q_{90,t}] - \text{target\_coverage}\right|$$
 
-**滚动 z-score 标准化**（窗口 $W=60$，前60天使用 expanding window）：
+**代码实现：** (`evaluation/metrics.py`)
+```python
+def coverage_error(
+    y_true: np.ndarray, lower: np.ndarray, upper: np.ndarray, target_coverage: float = 0.8,
+) -> float:
+    in_interval = (y_true >= lower) & (y_true <= upper)
+    coverage = np.mean(in_interval)
+    return np.abs(coverage - target_coverage)
+```
 
-$$\tilde{x}_{t,i} = \frac{x_{t,i} - \mu_{t-W:t,i}}{\sigma_{t-W:t,i} + \epsilon}, \qquad \epsilon = 10^{-8}$$
+#### 5.2 Winkler Score
+评估区间的综合质量（包括宽度和未覆盖时的惩罚）。
+**数学公式：**
+$$W_t = \begin{cases} (q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (q_{10,t}-y_t) & y_t < q_{10,t} \\ q_{90,t}-q_{10,t} & q_{10,t} \leq y_t \leq q_{90,t} \\ (q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (y_t-q_{90,t}) & y_t > q_{90,t} \end{cases}$$
+*(注意：默认 alpha = 0.2, 对应惩罚系数为 10)*
 
-**数据切分**：
+**代码实现：** (`evaluation/metrics.py`)
+```python
+def winkler_score(
+    y_true: np.ndarray, lower: np.ndarray, upper: np.ndarray, alpha: float = 0.2
+) -> float:
+    width = upper - lower
+    penalty_lower = np.where(y_true < lower, (2 / alpha) * (lower - y_true), 0)
+    penalty_upper = np.where(y_true > upper, (2 / alpha) * (y_true - upper), 0)
+    winkler = width + penalty_lower + penalty_upper
+    return np.mean(winkler)
+```
 
-| 集合 | 时间范围 | 用途 |
-|---|---|---|
-| 训练集 | 2019-01-01 ~ 2021-12-31 | 模型训练 |
-| 验证集 Q1 | 2022-01-01 ~ 2022-03-31 | CP calibration split |
-| 验证集 Q2~Q4 | 2022-04-01 ~ 2022-12-31 | $\beta$ 选择与评估 |
-| 测试集 | 2023-01-01 ~ 2024-12-31 | 最终评估 |
-
----
-
-## 实验设计
-
-### 核心假设
-
-**声明A（区间质量）**：在A股日频非平稳数据上，蜗牛壳的区间在 Coverage Error 相近的前提下，Winkler Score 低于 Conformal Prediction；目标是在高波动、regime 切换等特定子场景下经验性地优于 CP。
-
-**声明B（点预测质量）**：蜗牛壳的 MAE 和 RankIC 优于纯 QR(q50) 和 MSE baseline，说明软拉回机制对点预测有增益。
-
-### 对照组
-
-| 组别 | 区间来源 | 点预测来源 | $\beta$ |
-|---|---|---|---|
-| Residual | 点预测 ± 1.28σ 残差 | MSE LightGBM | — |
-| CP | EnbPI（calibration: 2022 Q1） | q50 | — |
-| QR | Pinball Loss 无拉回 | MSE LightGBM | $0$ |
-| Q50-only | — | 直接输出 $a_t$ | $\infty$ |
-| Snail-0.5 | Pinball Loss + 软拉回 | MSE LightGBM | $0.5$ |
-| Snail-1 | Pinball Loss + 软拉回 | MSE LightGBM | $1$ |
-| Snail-2 | Pinball Loss + 软拉回 | MSE LightGBM | $2$ |
-| Snail-5 | Pinball Loss + 软拉回 | MSE LightGBM | $5$ |
-
-**CP baseline 规格**：
-- Nonconformity score：$|y_t - \hat{y}_{q_{50},t}|$
-- Calibration split：2022 Q1
-- 区间构造：$\hat{y}_{q_{50}} \pm \text{quantile}_{0.9}(\text{residuals on calibration set})$
-
-### $\beta$ 选择标准（验证集复合指标）
-
+#### 5.3 复合评分 (Composite Score)
+用于 $\beta$ 的选取。
+**数学公式：**
 $$\text{Score} = \bar{W} + 10 \cdot \max(0,\ \text{CE} - 0.05)$$
 
-$\beta$ 的选择与模型超参调优解耦：先在训练集确定 LightGBM 超参，再在验证集 Q2~Q4 上选 $\beta$。
-
----
-
-## 评估指标
-
-评估体系分两块，职责分明：
-
-### 区间质量（区分 Residual / CP / QR）
-
-**Coverage Error**（第一关，硬约束）：
-
-$$\text{CE} = \left|\frac{1}{N}\sum_{t=1}^N \mathbf{1}[\hat{y}_{q_{10},t} \leq y_t \leq \hat{y}_{q_{90},t}] - 0.8\right|$$
-
-**Winkler Score**（第二关，主要胜负标准，越低越好）：
-
-$$W_t = \begin{cases} (q_{90,t}-q_{10,t}) + 10 \cdot (q_{10,t}-y_t) & y_t < q_{10,t} \\ q_{90,t}-q_{10,t} & q_{10,t} \leq y_t \leq q_{90,t} \\ (q_{90,t}-q_{10,t}) + 10 \cdot (y_t-q_{90,t}) & y_t > q_{90,t} \end{cases}$$
-
-**区间宽度**（辅助）：$\text{IW} = \frac{1}{N}\sum_t (q_{90,t} - q_{10,t})$
-
-### 点预测质量（区分 Snail 各变体）
-
-**MAE**：$\text{MAE} = \frac{1}{N}\sum_t |\hat{y}_t^* - y_t|$
-
-**RankIC**：$\text{RankIC}_t = \text{Spearman}(\text{rank}(\hat{y}_t^*),\ \text{rank}(y_t))$
-
-### 统计显著性
-
-对核心指标差异补充配对 t 检验：
-
-$$t = \frac{\bar{d}}{s_d / \sqrt{n}}, \qquad d_t = W_t^{\text{Snail}} - W_t^{\text{CP}}$$
-
-### 第三关：2022 Q2~Q4 单独报告
-
-所有指标在 2022 Q2~Q4 段单独计算，这是 regime 切换最密集的区间，是最有说服力的场景。
-
----
-
-## 可视化
-
-**图一：Pareto 曲线** —— 所有方法在 Coverage vs Width 空间的散点图，目标是左下角（覆盖率高且区间窄）。
-
-**图二：时间动态图** —— Winkler Score vs Time，重点观察 2022 段各方法的稳定性对比。
-
----
-
-## 完整数据流
-
-```
-输入特征 x_t
-    ↓ 滚动 z-score（W=60，前60天 expanding window）
-┌──────────────────────────────────────┐
-│  LightGBM MSE + early_stop → ŷ_t    │  点预测
-│  LightGBM q10 + early_stop → q̂₁₀  │
-│  LightGBM q50 + early_stop → a_t    │  锚点
-│  LightGBM q90 + early_stop → q̂₉₀  │
-└──────────────────────────────────────┘
-    ↓ Quantile Crossing 后处理 → 统计 Crossing Rate
-r_t = (q̂₉₀ - q̂₁₀) / 2               可信圆半径
-    ↓
-α_t = exp(-β · |ŷ_t - a_t| / r_t)
-    ↓
-ŷ_t* = α_t · ŷ_t + (1-α_t) · a_t    → MAE / RankIC（区分 Snail 变体）
-[q̂₁₀, q̂₉₀]                          → Coverage Error / Winkler（对比 CP）
-p_t = (a_t, r_t)                      → 螺旋监控（v_t 加 ε 防爆炸）
+**代码实现：** (`evaluation/metrics.py`)
+```python
+def composite_score(
+    winkler_mean: float, coverage_error: float, target_ce: float = 0.05
+) -> float:
+    return winkler_mean + 10 * max(0, coverage_error - target_ce)
 ```
 
----
+#### 5.4 RankIC & MAE (点预测质量)
+**数学公式：**
+$$\text{MAE} = \frac{1}{N}\sum_t |\hat{y}_t^* - y_t|$$
+$$\text{RankIC} = \text{Spearman}(\text{rank}(\hat{y}_t^*),\ \text{rank}(y_t))$$
 
-## 仓库结构
+**代码实现：** (`evaluation/metrics.py`)
+```python
+def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return np.mean(np.abs(y_true - y_pred))
 
-```
-snail-shell/
-  core/
-    quantile_head.py       # Pinball Loss + 四模型训练
-    snail_mechanism.py     # 可信圆 + 软拉回（β 控制）
-    spiral_monitor.py      # 二维锚点 + 螺旋拟合 + 外扩速度
-  experiments/
-    baseline_lgbm.py       # Residual / CP / QR / Q50-only
-    snail_lgbm.py          # Snail-0.5/1/2/5
-  evaluation/
-    metrics.py             # CE / Winkler / IW / MAE / RankIC
-    visualize.py           # Pareto 曲线 / 时间动态图
-  notes/
-    math_derivation.md     # 数学推导记录
-  README.md
+def rank_ic(y_pred: np.ndarray, y_true: np.ndarray) -> float:
+    return stats.spearmanr(y_pred, y_true).correlation
 ```
 
----
+#### 5.5 交叉率 (Crossing Rate)
+检测分位数模型的预测质量。
+**数学公式：**
+$$\text{Crossing\_Rate} = \frac{\sum \mathbf{1}[q_{10,t} > q_{90,t}]}{N}$$
 
-## Limitation
-
-1. **覆盖率保证**：蜗牛壳无理论覆盖率保证，CE 的控制依赖 Pinball Loss 的经验校准质量。
-2. **$\beta$ 选择**：最优 $\beta$ 在验证集上选取，存在对验证集过拟合的风险；$\beta$ 选择与模型超参调优解耦以缓解此问题。
-3. **螺线形态**：锚点轨迹是否呈对数螺线为观察结论，非先验假设，$R^2$ 作为形态质量指标一并报告。
-4. **Crossing Rate**：若 > 10%，说明分位数估计质量有限，拉回机制可能掩盖了模型本身的缺陷。
-5. **数据范围**：实验仅覆盖 A 股日频数据，结论泛化性待验证。
-6. **螺旋监控**：目前是事后归因工具，不作为实时交易信号。
-
----
-
-## 相关工作
-
-- Romano et al. (2019). *Conformalized Quantile Regression*. NeurIPS.
-- Xu & Xie (2021). *Conformal Prediction Interval for Dynamic Time Series*. ICML.
-- Gibbs & Candès (2021). *Adaptive Conformal Inference Under Distribution Shift*. NeurIPS.
-
----
-
-*snail-shell v2.0 · A股日频区间预测框架*
+**代码实现：** (`evaluation/metrics.py`)
+```python
+def crossing_rate(q10: np.ndarray, q90: np.ndarray) -> float:
+    crossing_mask = q10 > q90
+    crossing_count = np.sum(crossing_mask)
+    total_count = len(q10)
+    return crossing_count / total_count if total_count > 0 else 0.0
+```
