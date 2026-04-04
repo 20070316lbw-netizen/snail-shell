@@ -1,0 +1,43 @@
+Schema of features_cn:
+              column_name column_type null   key default extra
+0                  ticker     VARCHAR   NO   PRI    None  None
+1                    date        DATE   NO   PRI    None  None
+2             index_group     VARCHAR  YES  None    None  None
+3            regime_label     VARCHAR  YES  None    None  None
+4                 mom_20d      DOUBLE  YES  None    None  None
+5                 mom_60d      DOUBLE  YES  None    None  None
+6        mom_12m_minus_1m      DOUBLE  YES  None    None  None
+7             vol_60d_res      DOUBLE  YES  None    None  None
+8                sp_ratio      DOUBLE  YES  None    None  None
+9                turn_20d      DOUBLE  YES  None    None  None
+10           mom_20d_rank      DOUBLE  YES  None    None  None
+11           mom_60d_rank      DOUBLE  YES  None    None  None
+12  mom_12m_minus_1m_rank      DOUBLE  YES  None    None  None
+13       vol_60d_res_rank      DOUBLE  YES  None    None  None
+14          sp_ratio_rank      DOUBLE  YES  None    None  None
+15          turn_20d_rank      DOUBLE  YES  None    None  None
+16       label_next_month      DOUBLE  YES  None    None  None
+17  label_next_month_rank     INTEGER  YES  None    None  None
+
+Schema of prices_cn:
+  column_name column_type null   key default extra
+0      ticker     VARCHAR   NO   PRI    None  None
+1        date        DATE   NO   PRI    None  None
+2        open      DOUBLE  YES  None    None  None
+3        high      DOUBLE  YES  None    None  None
+4         low      DOUBLE  YES  None    None  None
+5       close      DOUBLE  YES  None    None  None
+6      volume      DOUBLE  YES  None    None  None
+7        turn      DOUBLE  YES  None    None  None
+8          ps      DOUBLE  YES  None    None  None
+
+Sample of features_cn:
+      ticker       date index_group regime_label   mom_20d   mom_60d  mom_12m_minus_1m  vol_60d_res  sp_ratio  turn_20d  mom_20d_rank  mom_60d_rank  mom_12m_minus_1m_rank  vol_60d_res_rank  sp_ratio_rank  turn_20d_rank  label_next_month  label_next_month_rank
+0  002104.SZ 2024-08-30        None         None  0.050375  0.088829         -0.134698    -0.008976 -0.308309 -0.444045      0.753623      0.728595               0.237856          0.030695       0.514423       0.354267          0.288973                      3
+1  603192.SS 2024-08-30        None         None  0.087289  0.073910         -0.091564     0.000121  0.871924  0.016500      0.882353      0.828909               0.337349          0.657817       0.873900       0.720588          0.142649                      0
+
+Sample of prices_cn:
+Empty DataFrame
+Columns: [ticker, date, open, high, low, close, volume, turn, ps]
+Index: []
+

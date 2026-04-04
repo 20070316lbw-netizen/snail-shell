@@ -1,0 +1,64 @@
+name: 🐌 Snail-Shell 20260406 数据同步与每日预测
+
+on:
+  schedule:
+    # 每天北京时间 16:30 (UTC 08:30) 运行，确保收盘数据已更新
+    - cron: '30 8 * * *'
+  workflow_dispatch:
+    # 允许手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  sync_and_predict:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 签出代码
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: 设置 Python 环境
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: 安装项目依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 数据同步 (Goal 1)
+        run: |
+          export PYTHONPATH=$PYTHONPATH:.
+          # 运行同步脚本，更新数据库
+          python scripts/sync_data.py
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: 每日预测并生成报告 (Goal 2)
+        run: |
+          export PYTHONPATH=$PYTHONPATH:.
+          # 运行预测脚本，生成最新的 Markdown 报告
+          # 使用 -m 方式确保模块引用正常
+          python -m scripts.daily_predict
+        env:
+          PYTHONUNBUFFERED: 1
+
+      - name: 提交并推送更新
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 检查是否有文件更新（数据库及报告）
+          git add QQ_Quant_DB/quant_lab.duckdb reports/daily/*.md
+          
+          if git diff --staged --quiet; then
+            echo "没有发现数据或报告更新，跳过提交。"
+          else
+            git commit -m "🐌 [Auto] 自动同步数据并更新每日预测报告 ($(date +'%Y-%m-%d'))"
+            git push
+          fi

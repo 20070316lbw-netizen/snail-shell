@@ -32,9 +32,13 @@ $$\frac{\partial \mathcal{L}_q}{\partial \hat{y}} = \begin{cases}
 ### 核心公式
 软拉回机制通过以下公式修正点预测：
 
-$$\alpha_t = \exp\left(-\beta \cdot \frac{|\hat{y}_t - a_t|}{r_t}\right)$$
-
 $$\hat{y}_t^* = \alpha_t \cdot \hat{y}_t + (1 - \alpha_t) \cdot a_t$$
+
+$$q_{10,t}^* = \hat{y}_t^* - r_t, \qquad q_{90,t}^* = \hat{y}_t^* + r_t$$
+
+### 核心逻辑说明
+1. **点预测修正**：$\hat{y}_t^*$ 被拉向锚点 $a_t$。
+2. **区间重构**：**关键步骤**。软拉回不仅修正点预测，还以 $\hat{y}_t^*$ 为中心重新构建预测区间 $[q_{10,t}^*, q_{90,t}^*]$，但保持其半径 $r_t$ 不变。这确保了 $\beta$ 的调整能直接影响 Coverage 和 Winkler Score。
 
 ### 参数解释
 - $\hat{y}_t$：原始点预测（MSE LightGBM输出）
@@ -120,8 +124,8 @@ $$v_t = \frac{\rho_t - \rho_{t-1}}{\theta_t - \theta_{t-1} + \epsilon}$$
 $$\text{Alert}_t = \mathbf{1}\left[v_t > \mu_{v,t} + 2\sigma_{v,t}\right]$$
 
 其中：
-- $\mu_{v,t}$：过去 $W$ 个时间点的速度均值
-- $\sigma_{v,t}$：过去 $W$ 个时间点的速度标准差
+- $\mu_{v,t}$：过去 $W$ 个时间点的速度均值（不含当前点 $t$）
+- $\sigma_{v,t}$：过去 $W$ 个时间点的速度标准差（不含当前点 $t$）
 
 ---
 
@@ -132,12 +136,12 @@ $$\text{CE} = \left|\frac{1}{N}\sum_{t=1}^N \mathbf{1}[\hat{y}_{q_{10},t} \leq y
 
 ### Winkler Score
 $$W_t = \begin{cases} 
-(q_{90,t}-q_{10,t}) + \frac{1}{\alpha} \cdot (q_{10,t}-y_t) & y_t < q_{10,t} \\ 
+(q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (q_{10,t}-y_t) & y_t < q_{10,t} \\ 
 q_{90,t}-q_{10,t} & q_{10,t} \leq y_t \leq q_{90,t} \\ 
-(q_{90,t}-q_{10,t}) + \frac{1}{\alpha} \cdot (y_t-q_{90,t}) & y_t > q_{90,t} 
+(q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (y_t-q_{90,t}) & y_t > q_{90,t} 
 \end{cases}$$
 
-其中 $\alpha = 0.2$ 对应80%置信区间。
+其中 $\alpha = 0.2$ 对应80%置信区间，惩罚系数 $\frac{2}{\alpha} = 10$。
 
 ### 复合评分
 $$\text{Score} = \bar{W} + 10 \cdot \max(0,\ \text{CE} - 0.05)$$
@@ -231,4 +235,4 @@ $$\hat{y}_t^{**} = \sum_{\beta} w_\beta \cdot \hat{y}_{t,\beta}^*$$
 
 ---
 
-*最后更新：2026-04-01*
+*最后更新：2026-04-05*

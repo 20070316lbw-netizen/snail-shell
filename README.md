@@ -76,7 +76,8 @@ $$r_t = \frac{\hat{y}_{q_{90},t} - \hat{y}_{q_{10},t}}{2}$$
 
 **数学公式：**
 $$\alpha_t = \begin{cases} \mathbf{1}\left[\frac{|\hat{y}_t - a_t|}{r_t} == 0\right], & \text{if } \beta = \infty \\ \exp\left(-\beta \cdot \frac{|\hat{y}_t - a_t|}{r_t}\right), & \text{otherwise} \end{cases}$$
-$$\hat{y}_t^* = \alpha_t \cdot \hat{y}_t + (1 - \alpha_t) \cdot a_t$$
+$$q_{10,t}^* = \hat{y}_t^* - r_t$$
+$$q_{90,t}^* = \hat{y}_t^* + r_t$$
 
 **代码实现：** (`core/snail_mechanism.py`)
 ```python
@@ -97,14 +98,18 @@ def calculate_alpha(
 
 def soft_pullback(
     point_pred: np.ndarray, anchor: np.ndarray, radius: np.ndarray, beta: float = 1.0
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     # 计算α_t
     alpha = calculate_alpha(point_pred, anchor, radius, beta)
 
-    # 软拉回
+    # 软拉回（点预测）
     corrected_pred = alpha * point_pred + (1 - alpha) * anchor
 
-    return corrected_pred
+    # 关键：同步移动区间中心，保持半径不变
+    corrected_q10 = corrected_pred - radius
+    corrected_q90 = corrected_pred + radius
+
+    return corrected_pred, corrected_q10, corrected_q90
 ```
 
 ### 4. 螺旋监控 (Logarithmic Spiral)
