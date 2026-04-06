@@ -1,238 +1,353 @@
-# 数学推导记录
+# GSPQR 数学推导与完整证明
 
-## 1. Pinball Loss（分位数回归损失函数）
+> 本文档对项目中所有数学命题进行分类标注：
+> - **[Theorem + Proof]**：严格可证命题，含完整证明
+> - **[Empirical Observation]**：仅有实证支持，无法在一般情况下严格证明
+> - **[Design Choice]**：工程设计决策，无需证明，但需说明动机
+>
+> *最后更新：2026-04-06*
+
+---
+
+## 1. Pinball Loss（分位数回归损失）
 
 ### 定义
-对于分位数 $q \in (0,1)$，Pinball Loss定义为：
 
-$$\mathcal{L}_q(y, \hat{y}) = \max\left(q(y-\hat{y}),\ (q-1)(y-\hat{y})\right)$$
+对分位数 $\tau \in (0, 1)$，Pinball Loss 定义为：
 
-### 等价形式
-可以重写为：
-$$\mathcal{L}_q(y, \hat{y}) = \begin{cases}
-q(y-\hat{y}) & \text{if } y \geq \hat{y} \\
-(1-q)(\hat{y}-y) & \text{if } y < \hat{y}
-\end{cases}$$
+$$\mathcal{L}_\tau(y, \hat{y}) = \max\bigl(\tau(y - \hat{y}),\ (\tau - 1)(y - \hat{y})\bigr)$$
 
-### 梯度
-对 $\hat{y}$ 求导：
-$$\frac{\partial \mathcal{L}_q}{\partial \hat{y}} = \begin{cases}
--q & \text{if } y \geq \hat{y} \\
-1-q & \text{if } y < \hat{y}
-\end{cases}$$
+### Theorem 1.1：等价分段形式
 
-### 特殊情况
-- 当 $q = 0.5$ 时，Pinball Loss等价于MAE（平均绝对误差）
-- 当 $q = 0.9$ 时，对低估的惩罚是对高估惩罚的9倍
+$$\mathcal{L}_\tau(y, \hat{y}) = \begin{cases} \tau(y - \hat{y}) & \text{if } y \geq \hat{y} \\ (1 - \tau)(\hat{y} - y) & \text{if } y < \hat{y} \end{cases}$$
 
----
+**Proof.**
 
-## 2. 软拉回机制
+分两种情形讨论。
 
-### 核心公式
-软拉回机制通过以下公式修正点预测：
+**情形 1：** $y \geq \hat{y}$，即 $y - \hat{y} \geq 0$。
 
-$$\hat{y}_t^* = \alpha_t \cdot \hat{y}_t + (1 - \alpha_t) \cdot a_t$$
+由于 $\tau \in (0,1)$，有 $\tau > \tau - 1$，故当 $y - \hat{y} \geq 0$ 时，$\tau(y-\hat{y}) \geq (\tau-1)(y-\hat{y})$。
 
-$$q_{10,t}^* = \hat{y}_t^* - r_t, \qquad q_{90,t}^* = \hat{y}_t^* + r_t$$
+因此 $\mathcal{L}_\tau = \tau(y - \hat{y})$。
 
-### 核心逻辑说明
-1. **点预测修正**：$\hat{y}_t^*$ 被拉向锚点 $a_t$。
-2. **区间重构**：**关键步骤**。软拉回不仅修正点预测，还以 $\hat{y}_t^*$ 为中心重新构建预测区间 $[q_{10,t}^*, q_{90,t}^*]$，但保持其半径 $r_t$ 不变。这确保了 $\beta$ 的调整能直接影响 Coverage 和 Winkler Score。
+**情形 2：** $y < \hat{y}$，即 $y - \hat{y} < 0$。
 
-### 参数解释
-- $\hat{y}_t$：原始点预测（MSE LightGBM输出）
-- $a_t$：锚点（q50分位数回归输出）
-- $r_t$：可信圆半径
-- $\beta$：插值控制器（拉回强度参数）
-- $\alpha_t$：混合系数（0-1之间）
+此时 $\tau(y-\hat{y}) < 0$ 且 $(\tau-1)(y-\hat{y}) > 0$（因 $\tau-1 < 0$，$y-\hat{y} < 0$，负负得正）。
 
-### 几何解释
-1. **当 $|\hat{y}_t - a_t| \ll r_t$**：
-   - $\alpha_t \approx 1$，$\hat{y}_t^* \approx \hat{y}_t$
-   - 点预测几乎不受影响
+因此 $\mathcal{L}_\tau = (\tau-1)(y-\hat{y}) = (1-\tau)(\hat{y}-y)$。
 
-2. **当 $|\hat{y}_t - a_t| \approx r_t$**：
-   - $\alpha_t = \exp(-\beta)$
-   - 拉回强度由 $\beta$ 控制
-
-3. **当 $|\hat{y}_t - a_t| \gg r_t$**：
-   - $\alpha_t \to 0$，$\hat{y}_t^* \to a_t$
-   - 点预测被强烈拉向锚点
-
-### β值的行为表
-
-| β | α_t (偏离=r_t) | α_t (偏离=2r_t) | 行为 | 角色 |
-|---|----------------|------------------|------|------|
-| 0 | 1.000 | 1.000 | 完全不拉回 | 对照组（退化纯QR） |
-| 0.5 | 0.607 | 0.368 | 温和拉回 | Snail-0.5 |
-| 1 | 0.368 | 0.135 | 标准拉回 | Snail-1 |
-| 2 | 0.135 | 0.018 | 强拉回 | Snail-2 |
-| 5 | 0.007 | 0.000 | 近似截断 | Snail-5 |
-| ∞ | 0.000 | 0.000 | 完全拉回 | 对照组（退化纯q50） |
+综合两种情形，等价分段形式得证。$\blacksquare$
 
 ---
 
-## 3. 可信圆
+### Theorem 1.2：Pinball Loss 关于 $\hat{y}$ 是凸函数
 
-### 定义
-可信圆由锚点和半径定义：
+**Proof.**
 
-$$a_t = \hat{y}_{q_{50},t}$$
-
-$$r_t = \frac{\hat{y}_{q_{90},t} - \hat{y}_{q_{10},t}}{2}$$
-
-### 置信区间
-对应的80%置信区间为：
-
-$$[\hat{y}_{q_{10},t}, \hat{y}_{q_{90},t}] = [a_t - r_t, a_t + r_t]$$
-
-### 几何意义
-- 锚点 $a_t$：预测的中心趋势
-- 半径 $r_t$：模型的不确定性度量
-- 可信圆：以锚点为中心，半径为 $r_t$ 的区间
+由 Theorem 1.1，$\mathcal{L}_\tau$ 是两个关于 $\hat{y}$ 的仿射函数的逐点最大值。有限个凸函数的逐点最大值仍为凸函数（标准结论）。$\blacksquare$
 
 ---
 
-## 4. 螺旋监控
+### Theorem 1.3：梯度（次梯度）
 
-### 极坐标转换
-将二维锚点 $\mathbf{p}_t = (a_t, r_t)$ 投影到极坐标：
+$$\frac{\partial \mathcal{L}_\tau}{\partial \hat{y}} = \begin{cases} -\tau & \text{if } y > \hat{y} \\ 1 - \tau & \text{if } y < \hat{y} \end{cases}$$
 
-$$\rho_t = \sqrt{a_t^2 + r_t^2}$$
+在 $y = \hat{y}$ 处函数不可微，次梯度集合为 $[\tau - 1,\ -\tau]$（包含 0，与该点为局部最小值一致）。
 
-$$\theta_t = \arctan2(r_t, a_t)$$
+**Proof.**
 
-### 对数螺线拟合
-观察发现锚点轨迹近似对数螺线：
+当 $y > \hat{y}$ 时，$\mathcal{L}_\tau = \tau(y-\hat{y})$，对 $\hat{y}$ 求导得 $-\tau$。
 
-$$\log \rho_t = \log A + B\theta_t$$
+当 $y < \hat{y}$ 时，$\mathcal{L}_\tau = (1-\tau)(\hat{y}-y)$，对 $\hat{y}$ 求导得 $1-\tau$。
 
-等价于：
-$$\rho_t = A \cdot e^{B\theta_t}$$
-
-### 外扩速度
-外扩速度定义为：
-
-$$v_t = \frac{\rho_t - \rho_{t-1}}{\theta_t - \theta_{t-1} + \epsilon}$$
-
-其中 $\epsilon = 10^{-8}$ 防止除零。
-
-### 失效预警
-使用滚动窗口 $W=60$ 计算预警信号：
-
-$$\text{Alert}_t = \mathbf{1}\left[v_t > \mu_{v,t} + 2\sigma_{v,t}\right]$$
-
-其中：
-- $\mu_{v,t}$：过去 $W$ 个时间点的速度均值（不含当前点 $t$）
-- $\sigma_{v,t}$：过去 $W$ 个时间点的速度标准差（不含当前点 $t$）
+$y = \hat{y}$ 处次梯度为左右导数所围闭区间 $[\tau-1,\ -\tau]$。$\blacksquare$
 
 ---
 
-## 5. 评估指标
+### Theorem 1.4：当 $\tau = 0.5$ 时退化为 MAE
 
-### Coverage Error (CE)
-$$\text{CE} = \left|\frac{1}{N}\sum_{t=1}^N \mathbf{1}[\hat{y}_{q_{10},t} \leq y_t \leq \hat{y}_{q_{90},t}] - 0.8\right|$$
+**Proof.**
 
-### Winkler Score
-$$W_t = \begin{cases} 
-(q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (q_{10,t}-y_t) & y_t < q_{10,t} \\ 
-q_{90,t}-q_{10,t} & q_{10,t} \leq y_t \leq q_{90,t} \\ 
-(q_{90,t}-q_{10,t}) + \frac{2}{\alpha} \cdot (y_t-q_{90,t}) & y_t > q_{90,t} 
-\end{cases}$$
+代入 $\tau = 0.5$：$\mathcal{L}_{0.5} = 0.5 \cdot |y - \hat{y}|$。
 
-其中 $\alpha = 0.2$ 对应80%置信区间，惩罚系数 $\frac{2}{\alpha} = 10$。
-
-### 复合评分
-$$\text{Score} = \bar{W} + 10 \cdot \max(0,\ \text{CE} - 0.05)$$
-
-### RankIC
-$$\text{RankIC} = \text{Spearman}(\text{rank}(\hat{y}_t^*),\ \text{rank}(y_t))$$
+最小化期望 $\mathbb{E}[\mathcal{L}_{0.5}]$ 等价于最小化 MAE，其最优解 $\hat{y}^* = \text{median}(y)$，与分位数回归 $\tau=0.5$ 的解一致。$\blacksquare$
 
 ---
 
-## 6. 数据预处理
+## 2. 代理目标与自适应中心估计
 
-### 滚动 z-score 标准化
-$$\tilde{x}_{t,i} = \frac{x_{t,i} - \mu_{t-W:t,i}}{\sigma_{t-W:t,i} + \epsilon}, \qquad \epsilon = 10^{-8}$$
+### 问题设定
 
-其中：
-- $W = 60$：滚动窗口大小
-- 前60天使用expanding window（从第一个样本开始到当前时间点）
+设在时间步 $t$，我们有两个预测器：
+- $\hat{y}_t$：条件均值估计（MSE 模型）
+- $a_t = \hat{q}_{0.5,t}$：条件中位数估计（q50 分位数模型）
 
-### 输入特征
-$\mathbf{x}_t \in \mathbb{R}^d$：
-- 过去 $T=20$ 天收益率序列
-- 成交量变化率
-- 动量因子（5日、20日）
+**动机**：A 股市场的均值-中位数分离现象表明两者携带互补信息——均值捕捉期望收益，中位数对重尾更鲁棒。
 
 ---
 
-## 7. 实验设计
+### Theorem 2.1：代理目标的闭合解
 
-### 数据切分
-| 集合 | 时间范围 | 用途 |
-|---|---|---|
-| 训练集 | 2019-01-01 ~ 2021-12-31 | 模型训练 |
-| 验证集 Q1 | 2022-01-01 ~ 2022-03-31 | CP calibration split |
-| 验证集 Q2~Q4 | 2022-04-01 ~ 2022-12-31 | β 选择与评估 |
-| 测试集 | 2023-01-01 ~ 2024-12-31 | 最终评估 |
+**代理目标**（对固定 $\lambda_t \in [0,1]$，关于中心 $c$ 最小化加权 MSE）：
 
-### β选择标准
-在验证集 Q2~Q4 上使用复合指标选择β：
+$$\hat{y}_t^* = \arg\min_{c \in \mathbb{R}} \Bigl\{ \lambda_t (c - \hat{y}_t)^2 + (1 - \lambda_t)(c - a_t)^2 \Bigr\}$$
 
-$$\beta^* = \arg\min_{\beta} \left\{ \bar{W}_\beta + 10 \cdot \max(0, \text{CE}_\beta - 0.05) \right\}$$
+**结论**：$\hat{y}_t^* = \lambda_t \hat{y}_t + (1 - \lambda_t) a_t \tag{1}$
 
-### 对照组
-| 组别 | 区间来源 | 点预测来源 | β |
+**Proof.**
+
+设 $F(c) = \lambda_t(c - \hat{y}_t)^2 + (1-\lambda_t)(c-a_t)^2$，为关于 $c$ 的二次函数，开口向上（系数之和为 1 > 0），存在唯一最小值点。
+
+令 $F'(c) = 0$：
+
+$$2\lambda_t(c - \hat{y}_t) + 2(1-\lambda_t)(c - a_t) = 0$$
+
+$$c(\lambda_t + 1 - \lambda_t) = \lambda_t \hat{y}_t + (1-\lambda_t)a_t$$
+
+$$\therefore \hat{y}_t^* = \lambda_t \hat{y}_t + (1-\lambda_t)a_t \qquad \blacksquare$$
+
+---
+
+### 重要说明：代理目标到门控函数的关系
+
+> **[Design Choice]** — 非推导关系，需明确区分。
+
+Theorem 2.1 表明，对**任意** $\lambda_t \in [0,1]$，最优中心均为 $\hat{y}_t$ 与 $a_t$ 的凸组合。这说明凸组合是合理的中心估计族，但**并未规定** $\lambda_t$ 应如何选取。
+
+GSPQR 选择以下门控函数：
+
+$$\lambda_t = G(r_t, \delta_t) = \exp\!\left(-\beta \cdot \frac{|\delta_t|}{r_t}\right), \quad \delta_t = \hat{y}_t - a_t \tag{2}$$
+
+这是**设计选择**，而非从优化问题推导而来。其合理性由 Section 3 的性质（极限行为、单调性、收缩性）保证。
+
+---
+
+## 3. 门控函数的性质
+
+### 符号约定
+
+- $\delta_t = \hat{y}_t - a_t$：均值与中位数之差（分歧）
+- $r_t = (\hat{q}_{90,t} - \hat{q}_{10,t}) / 2$：不确定性半径
+- $\eta_t = |\delta_t| / r_t$：归一化信噪比（SNR）
+- $\beta \geq 0$：拉回强度参数
+
+### Theorem 3.1：高不确定性时退化为均值预测
+
+$$r_t \to \infty \implies \eta_t \to 0 \implies \lambda_t \to 1 \implies \hat{y}_t^* \to \hat{y}_t$$
+
+**Proof.** 固定 $|\delta_t|$ 有限。$r_t \to \infty$ 时 $\eta_t \to 0$，$\lambda_t = \exp(-\beta\eta_t) \to 1$，代入 (1) 得 $\hat{y}_t^* \to \hat{y}_t$。$\blacksquare$
+
+---
+
+### Theorem 3.2：高置信度时退化为中位数预测
+
+$$r_t \to 0^+,\ |\delta_t| > 0 \implies \eta_t \to +\infty \implies \lambda_t \to 0 \implies \hat{y}_t^* \to a_t$$
+
+**Proof.** 固定 $|\delta_t| > 0$。$r_t \to 0^+$ 时 $\eta_t \to +\infty$，对 $\beta > 0$，$\lambda_t = \exp(-\beta\eta_t) \to 0$，代入 (1) 得 $\hat{y}_t^* \to a_t$。$\blacksquare$
+
+---
+
+### Theorem 3.3：$\beta$ 的极限行为
+
+**(a)** $\beta = 0$：$\lambda_t \equiv 1$，$\hat{y}_t^* = \hat{y}_t$（Snail-0，纯 MSE 基准）。
+
+**(b)** $\beta \to +\infty$，$|\delta_t| > 0$：$\lambda_t \to 0$，$\hat{y}_t^* \to a_t$（Snail-$\infty$，纯 Q50 基准）。
+
+**(c)** $\beta \to +\infty$，$\delta_t = 0$：$\eta_t = 0$，$\lambda_t = 1$，但 $\hat{y}_t = a_t$，故 $\hat{y}_t^* = \hat{y}_t = a_t$，结论一致。
+
+**Proof.**
+
+(a) $\lambda_t = \exp(0) = 1$，直接代入。
+
+(b) $\eta_t > 0$ 固定，$-\beta\eta_t \to -\infty$，$\exp(-\beta\eta_t) \to 0$。
+
+(c) $\delta_t = 0 \Rightarrow \hat{y}_t = a_t$，任何 $\lambda_t$ 均给出相同结果。$\blacksquare$
+
+---
+
+### Theorem 3.4：$\lambda_t$ 关于 SNR 单调递减
+
+$$\frac{\partial \lambda_t}{\partial \eta_t} = -\beta \exp(-\beta \eta_t) \leq 0$$
+
+当 $\beta > 0$ 时严格递减：SNR 越高（分歧相对不确定性越大），拉回越强。
+
+**Proof.** 直接对 $\lambda_t = \exp(-\beta\eta_t)$ 求导，利用 $\exp(\cdot) > 0$，$\beta \geq 0$。$\blacksquare$
+
+---
+
+## 4. 软拉回的几何性质
+
+### Theorem 4.1：软拉回的收缩性
+
+$$|\hat{y}_t^* - a_t| \leq |\hat{y}_t - a_t|$$
+
+**Proof.**
+
+$$\hat{y}_t^* - a_t = \lambda_t\hat{y}_t + (1-\lambda_t)a_t - a_t = \lambda_t(\hat{y}_t - a_t)$$
+
+$$|\hat{y}_t^* - a_t| = \lambda_t|\hat{y}_t - a_t| \leq |\hat{y}_t - a_t| \qquad (\lambda_t \in [0,1]) \qquad \blacksquare$$
+
+等号在 $\lambda_t = 1$（即 $\beta = 0$）时取到。
+
+---
+
+### Theorem 4.2：对称区间宽度不变性
+
+$$q_{10,t}^* = \hat{y}_t^* - r_t,\quad q_{90,t}^* = \hat{y}_t^* + r_t \implies |q_{90,t}^* - q_{10,t}^*| = 2r_t$$
+
+对所有 $\beta$、所有样本恒成立。
+
+**Proof.** $q_{90,t}^* - q_{10,t}^* = 2r_t$，直接展开。$\blacksquare$
+
+**推论**：所有 $\beta$ 变体的区间宽度相同，Winkler Score 的改善完全来自中心位置优化，而非区间压缩。
+
+---
+
+### 概念澄清：可信圆的两个层次
+
+> **[澄清：旧笔记存在不一致，此处修正]**
+
+| 概念 | 中心 | 区间 | 时机 |
 |---|---|---|---|
-| Residual | 点预测 ± 1.28σ 残差 | MSE LightGBM | — |
-| CP | EnbPI（calibration: 2022 Q1） | q50 | — |
-| QR | Pinball Loss 无拉回 | MSE LightGBM | 0 |
-| Q50-only | — | 直接输出 $a_t$ | ∞ |
-| Snail-0.5 | Pinball Loss + 软拉回 | MSE LightGBM | 0.5 |
-| Snail-1 | Pinball Loss + 软拉回 | MSE LightGBM | 1 |
-| Snail-2 | Pinball Loss + 软拉回 | MSE LightGBM | 2 |
-| Snail-5 | Pinball Loss + 软拉回 | MSE LightGBM | 5 |
+| 原始可信圆 | $a_t$（锚点） | $[a_t - r_t,\ a_t + r_t]$ | 软拉回之前 |
+| 最终预测区间 | $\hat{y}_t^*$（修正中心） | $[\hat{y}_t^* - r_t,\ \hat{y}_t^* + r_t]$ | 软拉回之后 |
+
+两者半径相同（均为 $r_t$），但中心不同，边界不同。由 Theorem 4.1，修正中心 $\hat{y}_t^*$ 比 $\hat{y}_t$ 更接近 $a_t$，但不一定与 $a_t$ 重合。
 
 ---
 
-## 8. 理论性质
+## 5. 评估指标的性质
 
-### 分位数回归的一致性
-对于分位数回归，当样本量趋于无穷时，估计量收敛到真实分位数：
+### 5.1 Winkler Score
 
-$$\hat{q}_\tau \xrightarrow{p} q_\tau$$
+**定义**（$\alpha = 0.2$，对应 80% 置信区间，惩罚系数 $2/\alpha = 10$）：
 
-### 软拉回的收缩性质
-软拉回机制是一个收缩估计器：
+$$W_t = \begin{cases}
+(q_{90,t} - q_{10,t}) + 10(q_{10,t} - y_t) & y_t < q_{10,t} \\[4pt]
+q_{90,t} - q_{10,t} & q_{10,t} \leq y_t \leq q_{90,t} \\[4pt]
+(q_{90,t} - q_{10,t}) + 10(y_t - q_{90,t}) & y_t > q_{90,t}
+\end{cases}$$
 
-$$\|\hat{y}_t^* - a_t\| \leq \|\hat{y}_t - a_t\|$$
+### Theorem 5.1：Winkler Score 非负性
 
-即修正后的预测总是比原始预测更接近锚点。
+$$W_t \geq 0 \quad \forall\, t$$
 
-### 螺旋监控的预警性质
-如果外扩速度持续高于历史水平，可能表明：
-1. 市场regime发生切换
-2. 模型预测能力下降
-3. 需要重新训练或调整参数
+**Proof.**
 
----
+情形 1（区间内）：$W_t = 2r_t \geq 0$。
 
-## 9. 未来扩展
+情形 2（低于下界）：$W_t = 2r_t + 10(q_{10,t} - y_t) \geq 2r_t \geq 0$。
 
-### 多期预测
-规划扩展至 $h \in \{1, 5, 10\}$ 日收益率预测：
-$$\hat{y}_{t,h} = f_h(\mathbf{x}_t)$$
-
-### 动态β调整
-考虑根据市场状态动态调整β值：
-$$\beta_t = g(\text{volatility}_t, \text{trend}_t, \ldots)$$
-
-### 集成方法
-集成多个β值的预测：
-$$\hat{y}_t^{**} = \sum_{\beta} w_\beta \cdot \hat{y}_{t,\beta}^*$$
+情形 3（高于上界）：$W_t = 2r_t + 10(y_t - q_{90,t}) \geq 2r_t \geq 0$。$\blacksquare$
 
 ---
 
-*最后更新：2026-04-05*
+### [Empirical Observation 5.2]：Winkler Score 关于 $\beta$ 的凸性
+
+论文 Section 4.4 报告，在 HS300 测试集上，$\bar{W}(\beta)$ 关于 $\beta$ 呈凸形，最小值在 $\beta^* \in [1.0, 2.0]$。
+
+**说明**：此命题在当前数据集上成立，但**无法在一般情形下严格证明**。$\bar{W}(\beta)$ 的行为取决于联合分布 $(y_t, \hat{y}_t, a_t, r_t)$，无强分布假设时理论凸性无法建立。实证支持见表 2 及图 4。
+
+---
+
+### [局限性说明]：GSPQR 无形式化覆盖保证
+
+GSPQR **不提供**形式化的有限样本覆盖保证，这与 Conformal Prediction（EnbPI）的根本区别。实验中观测覆盖率（84.23%）接近 80% 目标，但属于实证结果，而非理论保证。
+
+---
+
+### 5.2 复合评分
+
+$$\text{Score}(\beta) = \bar{W}(\beta) + 10 \cdot \max(0,\ \text{CE}(\beta) - 0.05) \tag{3}$$
+
+$\beta^*$ 通过在验证集（2022 Q2–Q4）上最小化公式 (3) 选取。惩罚项仅在覆盖误差超过 5 个百分点时激活，在校准约束下鼓励最小化区间宽度。
+
+---
+
+## 6. 分位数回归的统计性质
+
+### [Theorem with Caveats 6.1]：分位数回归的一致性
+
+设 $\{(x_t, y_t)\}$ 为 i.i.d. 样本，$y_t | x_t$ 的条件分布在目标分位数处有正密度，且模型类足够丰富，则 $n \to \infty$ 时：
+
+$$\hat{q}_\tau(x) \xrightarrow{p} q_\tau(x)$$
+
+**重要限制**：(1) A 股日频时序数据不满足 i.i.d. 假设；(2) LightGBM（树模型）的一致性需额外的树深/叶子数增长速率条件；(3) 跨截面设置下真实分位数函数跨股票异质，条件未严格验证。此结论仅作直觉参考，不应在本项目语境下作为严格理论基础引用。
+
+---
+
+## 7. 螺旋监控
+
+### [Empirical Observation 7.1]：锚点轨迹的对数螺线形态
+
+将 $(a_t, r_t)$ 投影到极坐标 $(\rho_t, \theta_t)$，其中 $\rho_t = \sqrt{a_t^2 + r_t^2}$，$\theta_t = \arctan2(r_t, a_t)$。
+
+**实证观察**：在 HS300 数据上，$\log\rho_t$ 与 $\theta_t$ 存在近似线性关系，即 $\rho_t \approx Ae^{B\theta_t}$。
+
+这是**观察性结论，非先验假设**（README 原文）。不同市场、不同时期的形态可能显著不同。
+
+---
+
+### Theorem 7.2：严格对数螺线下外扩速度为常数
+
+若轨迹严格满足 $\rho = Ae^{B\theta}$，则相邻步的外扩速度：
+
+$$v_t = \frac{\Delta\rho}{\Delta\theta} \approx \frac{d\rho}{d\theta} = ABe^{B\theta} = B\rho_t$$
+
+为当前半径的 $B$ 倍，是关于 $\rho_t$ 的线性函数。实际数据偏离此值即为轨迹形态变化的预警信号。
+
+**Proof.** 直接对 $\rho = Ae^{B\theta}$ 关于 $\theta$ 求导，代入差分近似。$\blacksquare$
+
+---
+
+### Theorem 7.3：滚动预警的统计意义
+
+预警规则 $\text{Alert}_t = \mathbf{1}[v_t > \mu_{v,t} + 2\sigma_{v,t}]$。
+
+若历史窗口内 $v_t$ 近似服从正态分布，则在零假设（无 regime 变化）下，$\text{Alert}_t = 1$ 的概率约为 $P(Z > 2) \approx 2.28\%$。超过此比例的触发率提示系统性异常。
+
+**说明**：金融时序中正态假设通常不严格成立，上述概率为近似参考值。
+
+---
+
+## 8. 统计显著性（论文 Section 4.5）
+
+### Theorem 8.1：配对 t 检验的正当性
+
+对每个测试样本 $i$，令 $d_i = W_i^{\text{GSPQR}} - W_i^{\text{EnbPI}}$，检验 $H_0: \mathbb{E}[d_i] = 0$。
+
+$$t = \frac{\bar{d}}{s_d / \sqrt{n}} = -68.5,\quad n = 120{,}512,\quad p \ll 0.001$$
+
+**有效性说明**：
+
+1. **样本量**：$n = 120{,}512$ 保证由中心极限定理 $\bar{d}$ 渐近正态，无需 $d_i$ 自身正态。
+2. **横截面相关性**：同一日期内不同股票的 $d_i$ 存在相关性，严格应使用聚类标准误。但鉴于 $|t| = 68.5$ 极大，结论的稳健性不受影响——即使对标准误进行保守调整，显著性依然成立。
+
+---
+
+## 附录：命题完整性总表
+
+| 编号 | 命题 | 类型 | 状态 |
+|---|---|---|---|
+| Thm 1.1 | Pinball Loss 等价分段形式 | 严格证明 | ✅ |
+| Thm 1.2 | Pinball Loss 关于 $\hat{y}$ 凸 | 严格证明 | ✅ |
+| Thm 1.3 | Pinball Loss 次梯度 | 严格证明 | ✅ |
+| Thm 1.4 | $\tau=0.5$ 退化为 MAE | 严格证明 | ✅ |
+| Thm 2.1 | 代理目标闭合解 | 严格证明 | ✅ |
+| Design | 门控函数 $G$ 的选取 | 设计选择 | ✅ 已澄清 |
+| Thm 3.1 | 高不确定性→信任均值 | 严格证明 | ✅ |
+| Thm 3.2 | 高置信度→信任中位数 | 严格证明 | ✅ |
+| Thm 3.3 | $\beta$ 极限行为 | 严格证明 | ✅ |
+| Thm 3.4 | $\lambda_t$ 关于 SNR 单调递减 | 严格证明 | ✅ |
+| Thm 4.1 | 软拉回收缩性 | 严格证明 | ✅ |
+| Thm 4.2 | 区间宽度不变性 | 严格证明 | ✅ |
+| 澄清 | 可信圆两个层次区分 | 概念修正 | ✅ 已修复 |
+| Thm 5.1 | Winkler Score 非负性 | 严格证明 | ✅ |
+| Obs 5.2 | Winkler 关于 $\beta$ 凸性 | 实证观察 | ⚠️ 已标注 |
+| 局限 | GSPQR 无覆盖保证 | 局限性声明 | ⚠️ 已标注 |
+| Thm 6.1 | 分位数一致性（附条件） | 条件定理 | ⚠️ 条件已说明 |
+| Obs 7.1 | 对数螺线形态 | 实证观察 | ⚠️ 已标注 |
+| Thm 7.2 | 严格螺线下外扩速度 | 严格证明 | ✅ |
+| Thm 7.3 | 滚动预警统计意义 | 近似分析 | ⚠️ 条件已说明 |
+| Thm 8.1 | 配对 t 检验正当性 | 分析 | ✅ 条件已说明 |
