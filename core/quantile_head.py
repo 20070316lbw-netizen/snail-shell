@@ -1,27 +1,20 @@
 """
-quantile_head.py - Pinball Loss + 四模型训练
+quantile_head.py - Pinball Loss + 四模型训练（LightGBM 后端）
 
 包含四个独立的LightGBM模型：
 1. 点预测器（MSE回归）
 2. 分位数q10（alpha=0.1）
 3. 分位数q50（alpha=0.5，锚点）
 4. 分位数q90（alpha=0.9）
+
+继承自 BaseQuantileHead，接口与其他后端（XGBoost / CatBoost）完全一致。
 """
 
 import numpy as np
 import lightgbm as lgb
 from typing import Dict, Tuple, Optional
-from dataclasses import dataclass
 
-
-@dataclass
-class FitConfig:
-    """训练配置类"""
-    X_train: np.ndarray
-    y_train: np.ndarray
-    X_val: Optional[np.ndarray] = None
-    y_val: Optional[np.ndarray] = None
-    callbacks: Optional[list] = None
+from core.base_quantile_head import BaseQuantileHead, FitConfig  # noqa: F401（re-export FitConfig）
 
 
 def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> float:
@@ -42,9 +35,9 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> 
     return np.mean(np.maximum(alpha * residual, (alpha - 1) * residual))
 
 
-class QuantileHead:
+class QuantileHead(BaseQuantileHead):
     """
-    四模型分位数回归头
+    四模型分位数回归头（LightGBM 后端）
 
     训练四个独立的LightGBM模型：
     - MSE回归器（点预测）
@@ -52,6 +45,8 @@ class QuantileHead:
     - q50分位数回归器（锚点）
     - q90分位数回归器
     """
+
+    backend_name = "LightGBM"
 
     def __init__(
         self,
