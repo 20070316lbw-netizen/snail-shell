@@ -203,22 +203,27 @@ def crossing_rate(q10: np.ndarray, q90: np.ndarray) -> float:
 
 
 def composite_score(
-    winkler_mean: float, coverage_error: float, target_ce: float = 0.05
+    winkler_mean: float, coverage_error: float, k: float = 2.0
 ) -> float:
     """
     计算复合评分指标
 
-    Score = W̄ + 10 * max(0, CE - 0.05)
+    Score = W̄ + k × CE
+
+    连续线性惩罚，CE 从 0 开始计，CE 越小得分越低（越好）。
+    相比旧版（CE ≤ 0.05 无奖励的阶梯式惩罚），此版本持续奖励
+    覆盖率向目标 80% 的靠近，使 AS-GSPQR 的 CE 改善能够体现
+    在最终评分上。
 
     Args:
-        winkler_mean: 平均Winkler Score
-        coverage_error: Coverage Error
-        target_ce: 目标Coverage Error
+        winkler_mean: 平均 Winkler Score
+        coverage_error: Coverage Error（= |实际覆盖率 - 0.8|）
+        k: CE 惩罚系数，默认 2.0（可在验证集上调参）
 
     Returns:
-        复合评分
+        复合评分（越小越好）
     """
-    return winkler_mean + 10 * max(0, coverage_error - target_ce)
+    return winkler_mean + k * coverage_error
 
 
 def calculate_all_metrics(
