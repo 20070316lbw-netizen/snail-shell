@@ -79,7 +79,7 @@ class MLPQuantileHead(BaseQuantileHead):
         self,
         hidden_dims     : list = None,
         dropout         : float = 0.1,
-        lr              : float = 1e-3,
+        lr              : float = 1e-4,
         batch_size      : int = 1024,
         max_epochs      : int = 200,
         patience        : int = 20,
@@ -119,12 +119,15 @@ class MLPQuantileHead(BaseQuantileHead):
         torch.manual_seed(self.random_state)
         np.random.seed(self.random_state)
 
-        X_tr = torch.tensor(config.X_train, dtype=torch.float32)
+        # NaN 填充：z-score 标准化后 0 = 均值，等价于"该特征无信号"
+        X_train_clean = np.nan_to_num(config.X_train, nan=0.0)
+        X_tr = torch.tensor(X_train_clean, dtype=torch.float32)
         y_tr = torch.tensor(config.y_train, dtype=torch.float32).unsqueeze(1)
 
         has_val = config.X_val is not None
         if has_val:
-            X_va = torch.tensor(config.X_val, dtype=torch.float32)
+            X_val_clean = np.nan_to_num(config.X_val, nan=0.0)
+            X_va = torch.tensor(X_val_clean, dtype=torch.float32)
             y_va = torch.tensor(config.y_val, dtype=torch.float32).unsqueeze(1)
 
         in_features = X_tr.shape[1]
@@ -166,6 +169,7 @@ class MLPQuantileHead(BaseQuantileHead):
                     + self.loss_weights["q90"] * _pinball_loss(self._heads["q90"](feat), yb, 0.9)
                 )
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(all_params, max_norm=0.5)
                 optimizer.step()
 
             # 早停：在验证集上评估
@@ -224,7 +228,7 @@ class MLPQuantileHead(BaseQuantileHead):
             h.eval()
 
         with torch.no_grad():
-            X_t  = torch.tensor(X, dtype=torch.float32)
+            X_t  = torch.tensor(np.nan_to_num(X, nan=0.0), dtype=torch.float32)
             feat = self._backbone(X_t)
             return {
                 "point" : self._heads["point"](feat).squeeze(1).numpy(),
