@@ -83,8 +83,13 @@ def _import_core() -> dict:
     from core.spiral_monitor import SpiralMonitor
     from experiments.baseline_lgbm import run_baseline_experiment
     from experiments.snail_lgbm import run_snail_experiment, select_best_beta, ExperimentConfig
+    from experiments.asymmetric_snail import (
+        run_asymmetric_experiment, select_best_beta_asymmetric,
+        compare_symmetric_vs_asymmetric, AsymmetricExperimentConfig,
+    )
     from evaluation.metrics import (
         evaluate_methods, calculate_all_metrics, paired_t_test, crossing_rate,
+        skewness_index, asymmetric_width_stats,
     )
     from evaluation.visualize import (
         plot_pareto_curve, plot_time_dynamics,
@@ -106,10 +111,16 @@ def _import_core() -> dict:
         "run_snail_experiment": run_snail_experiment,
         "ExperimentConfig": ExperimentConfig,
         "select_best_beta": select_best_beta,
+        "run_asymmetric_experiment": run_asymmetric_experiment,
+        "select_best_beta_asymmetric": select_best_beta_asymmetric,
+        "compare_symmetric_vs_asymmetric": compare_symmetric_vs_asymmetric,
+        "AsymmetricExperimentConfig": AsymmetricExperimentConfig,
         "evaluate_methods": evaluate_methods,
         "calculate_all_metrics": calculate_all_metrics,
         "paired_t_test": paired_t_test,
         "crossing_rate": crossing_rate,
+        "skewness_index": skewness_index,
+        "asymmetric_width_stats": asymmetric_width_stats,
         "plot_pareto_curve": plot_pareto_curve,
         "plot_time_dynamics": plot_time_dynamics,
         "plot_method_comparison": plot_method_comparison,
@@ -192,19 +203,79 @@ def _load_or_mock(ctx) -> tuple:
 
 # ── 公共工具 ───────────────────────────────────────────────────────────────────
 def _print_table(df: pd.DataFrame, title: str = ""):
-    """统一打印评估结果表格。"""
+    """统一打印评估结果表格。skewness_index 列若存在则附加在末尾。"""
     cols_order = [
         "Method", "actual_coverage", "coverage_error", "winkler_score", "interval_width",
-        "mae", "rank_ic", "composite_score",
+        "mae", "rank_ic", "composite_score", "skewness_index",
     ]
     cols_order = [c for c in cols_order if c in df.columns]
     df_show = df[cols_order].copy()
-    sep = "─" * 110
+    sep = "─" * 120
     if title:
         print(f"\n{title}")
     print(f"\n{sep}")
     print(df_show.to_string(index=False, na_rep="N/A", float_format=lambda x: f"{x:.4f}"))
     print(sep)
+
+
+def _print_ce_improvement(df_asym: pd.DataFrame):
+    """
+    打印 CE 改善专项报告：
+    - 逐 β 对比对称 vs 非对称的 Coverage Error
+    - 高亮 CE 绝对下降量和相对改善百分比
+    - 若 CE 已低于 5% 门槛，标注额外 Composite Score 奖励
+    """
+    if "coverage_error" not in df_asym.columns or "Method" not in df_asym.columns:
+        return
+
+    sym_rows  = df_asym[~df_asym["Method"].str.startswith("AS-")].set_index("Method")
+    asym_rows = df_asym[ df_asym["Method"].str.startswith("AS-")].set_index("Method")
+
+    if sym_rows.empty or asym_rows.empty:
+        return
+
+    print("\n" + "═" * 60)
+    print("📊  CE 改善专项报告（Coverage Error Improvement）")
+    print("═" * 60)
+    print(f"  {'对称方法':<16} {'AS方法':<18} {'对称CE':>8} {'AS-CE':>8} {'↓绝对':>7} {'↓相对%':>8}  {'达标?':>6}")
+    print("  " + "─" * 76)
+
+    CE_THRESHOLD = 0.05
+    any_printed = False
+
+    for asym_name, asym_row in asym_rows.iterrows():
+        # 匹配：AS-Snail-1.0 → Snail-1.0
+        beta_str = asym_name[len("AS-"):]          # e.g. "Snail-1.0"
+        sym_name = beta_str                          # "Snail-1.0"
+
+        if sym_name not in sym_rows.index:
+            # 回退：取对称组里 CE 最接近的行做参照
+            if sym_rows.empty:
+                continue
+            sym_name = sym_rows["coverage_error"].idxmin()
+
+        ce_sym  = sym_rows.loc[sym_name, "coverage_error"]
+        ce_asym = asym_row["coverage_error"]
+
+        delta    = ce_sym - ce_asym                 # 正值 = CE 下降（改善）
+        rel_pct  = (delta / ce_sym * 100) if ce_sym > 1e-9 else 0.0
+
+        sym_ok   = "✅" if ce_sym  <= CE_THRESHOLD else "❌"
+        asym_ok  = "✅" if ce_asym <= CE_THRESHOLD else "❌"
+        arrow    = "↓" if delta > 0 else ("↑" if delta < 0 else "=")
+
+        print(f"  {sym_name:<16} {asym_name:<18} "
+              f"{ce_sym:>8.4f} {ce_asym:>8.4f} "
+              f"{arrow}{abs(delta):>6.4f} {rel_pct:>+7.1f}%  "
+              f"{sym_ok}→{asym_ok}")
+        any_printed = True
+
+    if any_printed:
+        print("  " + "─" * 76)
+        print(f"  门槛: CE ≤ {CE_THRESHOLD:.0%}  |  ✅=已达标  ❌=超出门槛")
+        print(f"  注: CE 达标后不再进入 Composite Score 惩罚项；低于门槛的改善")
+        print(f"      体现在 Winkler Score 更低和区间预测更精确上。")
+    print("═" * 60)
 
 
 def _winkler_array(y: np.ndarray, lower: np.ndarray, upper: np.ndarray,
@@ -268,7 +339,7 @@ def cmd_compare(args, ctx):
     # ── 蜗牛壳变体 ────────────────────────────────────────────────
     if not args.no_snail:
         betas = args.betas if args.betas else [0.5, 1.0, 2.0, 5.0]
-        print(f"\n🐌 运行蜗牛壳变体 β={betas} ...")
+        print(f"\n🐌 运行对称蜗牛壳变体 β={betas} ...")
         config = ctx["ExperimentConfig"](
             X_train=Xtr, y_train=ytr,
             X_val=Xvq1,  y_val=yvq1,
@@ -277,6 +348,48 @@ def cmd_compare(args, ctx):
             X_val_q2_4=Xv, y_val_q2_4=yv,
         )
         all_preds.update(ctx["run_snail_experiment"](config))
+
+    # ── AS-GSPQR：非对称变体 ──────────────────────────────────────
+    if getattr(args, "asym", False) and not args.no_snail:
+        betas = args.betas if args.betas else [0.5, 1.0, 2.0, 5.0]
+        print(f"\n📐 运行非对称蜗牛壳变体（AS-GSPQR）β={betas} ...")
+        asym_config = ctx["AsymmetricExperimentConfig"](
+            X_train=Xtr, y_train=ytr,
+            X_val=Xvq1,  y_val=yvq1,
+            X_test=Xte,  y_test=yte,
+            beta_values=betas,
+            X_val_q2_4=Xv, y_val_q2_4=yv,
+        )
+        asym_results, asym_qh = ctx["run_asymmetric_experiment"](asym_config)
+
+        # 统一格式：corrected_center → point_pred（与 evaluate_methods 接口兼容）
+        for name, res in asym_results.items():
+            all_preds[name] = {
+                "point_pred": res["corrected_center"],
+                "lower":      res["lower"],
+                "upper":      res["upper"],
+            }
+            if "val_q2_4" in res:
+                all_preds[name]["val_q2_4"] = {
+                    "point_pred": res["val_q2_4"]["corrected_center"],
+                    "lower":      res["val_q2_4"]["lower"],
+                    "upper":      res["val_q2_4"]["upper"],
+                }
+
+        # 非对称专用表（含偏斜指数）
+        if not getattr(args, "quiet", False):
+            sym_results_for_compare = {
+                k: {"corrected_point": v.get("point_pred", v.get("corrected_point")),
+                    "lower": v["lower"], "upper": v["upper"]}
+                for k, v in all_preds.items() if not k.startswith("AS-")
+            }
+            df_asym = ctx["compare_symmetric_vs_asymmetric"](
+                yte, sym_results_for_compare, asym_results
+            )
+            _print_table(df_asym, "📐 对称 vs 非对称对比（含偏斜指数）：")
+
+            # ── CE 改善专项报告 ──────────────────────────────────
+            _print_ce_improvement(df_asym)
 
     # ── 评估：Test Set ───────────────────────────────────────────
     df_eval = ctx["evaluate_methods"](yte, all_preds)
@@ -325,7 +438,7 @@ def cmd_train(args, ctx):
 
     if args.mode in ("snail", "all"):
         betas = [args.beta] if args.beta else [0.5, 1.0, 2.0, 5.0]
-        print(f"\n🐌 训练蜗牛壳模型 β={betas} ...")
+        print(f"\n🐌 训练对称蜗牛壳模型 β={betas} ...")
         config = ctx["ExperimentConfig"](
             X_train=Xtr, y_train=ytr,
             X_val=Xvq1,  y_val=yvq1,
@@ -334,6 +447,24 @@ def cmd_train(args, ctx):
             X_val_q2_4=Xv, y_val_q2_4=yv,
         )
         results.update(ctx["run_snail_experiment"](config))
+
+    if args.mode in ("asym", "all"):
+        betas = [args.beta] if args.beta else [0.5, 1.0, 2.0, 5.0]
+        print(f"\n📐 训练非对称蜗牛壳模型（AS-GSPQR）β={betas} ...")
+        asym_config = ctx["AsymmetricExperimentConfig"](
+            X_train=Xtr, y_train=ytr,
+            X_val=Xvq1,  y_val=yvq1,
+            X_test=Xte,  y_test=yte,
+            beta_values=betas,
+            X_val_q2_4=Xv, y_val_q2_4=yv,
+        )
+        asym_results, _ = ctx["run_asymmetric_experiment"](asym_config)
+        for name, res in asym_results.items():
+            results[name] = {
+                "point_pred": res["corrected_center"],
+                "lower":      res["lower"],
+                "upper":      res["upper"],
+            }
 
     df_eval = ctx["evaluate_methods"](yte, results)
     _print_table(df_eval, "📈 测试集评估：")
@@ -601,6 +732,8 @@ def build_parser() -> argparse.ArgumentParser:
                        help="逗号分隔基线列表，如 cp,qr。默认全部 (residual,cp,qr,q50_only)")
     p_cmp.add_argument("--no-snail", action="store_true",
                        help="跳过蜗牛壳变体，仅运行基线对比")
+    p_cmp.add_argument("--asym", action="store_true",
+                       help="同时运行 AS-GSPQR 非对称变体并输出对称 vs 非对称对比表")
     p_cmp.add_argument("--plot", action="store_true",
                        help="实验完成后自动显示 Pareto + 时间动态图")
     p_cmp.add_argument("--output", type=str, default=None,
@@ -608,8 +741,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     # ── train ─────────────────────────────────────────────────────
     p_tr = subs.add_parser("train", help="单独训练指定模型并评估")
-    p_tr.add_argument("--mode", choices=["baseline", "snail", "all"], default="all",
-                      help="训练模式：baseline | snail | all（默认 all）")
+    p_tr.add_argument("--mode", choices=["baseline", "snail", "asym", "all"], default="all",
+                      help="训练模式：baseline | snail | asym | all（默认 all）")
     p_tr.add_argument("--beta", type=float, default=None,
                       help="单个 β 值（--mode snail 时生效；不指定则跑全部变体）")
     p_tr.add_argument("--baselines", type=str, default=None, metavar="LIST",

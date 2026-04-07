@@ -375,3 +375,110 @@ if __name__ == "__main__":
     print(f"  Actual coverage: {actual_coverage:.4f}")
 
     print("\nMetrics testing completed!")
+
+
+# ===========================================================================
+# AS-GSPQR 非对称区间专用指标
+# ===========================================================================
+
+def skewness_index(
+    lower: np.ndarray,
+    upper: np.ndarray,
+    center: np.ndarray,
+    epsilon: float = 1e-8,
+) -> float:
+    """
+    区间偏斜指数
+
+    SI = mean( (r_up - r_down) / (r_up + r_down) )
+
+    范围 [-1, 1]：
+      SI > 0 → 区间整体偏向上行（r_up > r_down），对应右偏分布
+      SI < 0 → 区间整体偏向下行（r_down > r_up），对应左偏分布
+      SI ≈ 0 → 近似对称（等价于 GSPQR 的对称假设）
+
+    Args:
+        lower  : 区间下界，形状 (N,)
+        upper  : 区间上界，形状 (N,)
+        center : 修正中心 ŷ*_t，形状 (N,)
+        epsilon: 防零除小量
+
+    Returns:
+        平均偏斜指数（标量）
+    """
+    r_down = center - lower
+    r_up   = upper - center
+    denom  = np.maximum(r_up + r_down, epsilon)
+    return float(np.mean((r_up - r_down) / denom))
+
+
+def asymmetric_width_stats(
+    lower: np.ndarray,
+    upper: np.ndarray,
+    center: np.ndarray,
+    epsilon: float = 1e-8,
+) -> Dict[str, float]:
+    """
+    非对称区间宽度统计
+
+    返回上/下半宽的均值、标准差及偏斜指数，便于分析非对称程度。
+
+    Args:
+        lower  : 区间下界，形状 (N,)
+        upper  : 区间上界，形状 (N,)
+        center : 修正中心，形状 (N,)
+        epsilon: 防零除小量
+
+    Returns:
+        字典，包含：
+          mean_r_down, std_r_down  — 下行半宽统计
+          mean_r_up,   std_r_up    — 上行半宽统计
+          skewness_index           — 偏斜指数
+          asymmetry_ratio          — r_up / r_down 的均值（>1 偏上，<1 偏下）
+    """
+    r_down = center - lower
+    r_up   = upper - center
+    denom  = np.maximum(r_up + r_down, epsilon)
+
+    return {
+        "mean_r_down"     : float(np.mean(r_down)),
+        "std_r_down"      : float(np.std(r_down)),
+        "mean_r_up"       : float(np.mean(r_up)),
+        "std_r_up"        : float(np.std(r_up)),
+        "skewness_index"  : float(np.mean((r_up - r_down) / denom)),
+        "asymmetry_ratio" : float(np.mean(r_up / np.maximum(r_down, epsilon))),
+    }
+
+
+def calculate_all_metrics_asymmetric(
+    y_true: np.ndarray,
+    point_pred: np.ndarray,
+    lower: np.ndarray,
+    upper: np.ndarray,
+    center: Optional[np.ndarray] = None,
+) -> Dict[str, float]:
+    """
+    计算所有指标（含非对称专用）
+
+    在 calculate_all_metrics 基础上追加 skewness_index 和非对称宽度统计。
+
+    Args:
+        y_true     : 真实值
+        point_pred : 点预测（修正后中心）
+        lower      : 区间下界
+        upper      : 区间上界
+        center     : 修正中心（若为 None 则用 point_pred 代替）
+
+    Returns:
+        指标字典
+    """
+    if center is None:
+        center = point_pred
+
+    metrics = calculate_all_metrics(y_true, point_pred, lower, upper)
+
+    # 追加非对称指标
+    asym_stats = asymmetric_width_stats(lower, upper, center)
+    metrics.update(asym_stats)
+
+    return metrics
