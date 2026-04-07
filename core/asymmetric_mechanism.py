@@ -263,7 +263,7 @@ class AsymmetricSnailMechanism:
                 coverage = float(np.mean((y_true >= lower) & (y_true <= upper)))
                 ce = abs(coverage - 0.8)
                 mae = float(np.mean(np.abs(center - y_true)))
-                score = winkler_mean + 10 * max(0, ce - 0.05)
+                score = winkler_mean + 2.0 * ce
                 return {
                     "score": score,
                     "winkler_mean": winkler_mean,
