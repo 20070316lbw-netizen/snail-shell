@@ -2,6 +2,10 @@
 This repository accompanies the paper:
 ["GSPQR: A Geometric Soft-Pullback Mechanism for Quantile Interval Prediction in A-Share Markets"](./GSPQR__A_Geometric_Soft_Pullback_Mechanism_for_Quantile_Interval_Prediction_in_A_Share_Markets%20.pdf)
 
+
+对应版本使用 'git switch symmetric-v1.0' 可以切换到对称版本
+
+
 > A股日频收益率区间预测框架，基于 LightGBM 分位数回归与软拉回机制
 
 **snail-shell** 是一个针对A股日频数据的区间预测系统。核心创新是**软拉回机制**：用分位数回归输出的不确定性半径，动态约束点预测的偏离程度，防止模型在高波动、regime 切换时产生极端预测。

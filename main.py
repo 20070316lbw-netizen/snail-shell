@@ -273,8 +273,8 @@ def _print_ce_improvement(df_asym: pd.DataFrame):
     if any_printed:
         print("  " + "─" * 76)
         print(f"  门槛: CE ≤ {CE_THRESHOLD:.0%}  |  ✅=已达标  ❌=超出门槛")
-        print(f"  注: CE 达标后不再进入 Composite Score 惩罚项；低于门槛的改善")
-        print(f"      体现在 Winkler Score 更低和区间预测更精确上。")
+        print(f"  注: Composite Score = W̄ + k×CE（k=2.0），CE 持续参与评分；")
+        print(f"      CE 越小得分越低（越好），AS-GSPQR 的覆盖率改善可直接体现。")
     print("═" * 60)
 
 
