@@ -15,9 +15,14 @@ multimodel_snail.py - 多后端 AS-GSPQR 对比实验
 import sys
 import os
 import argparse
+import warnings
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Type
+
+# 抑制已知的无害 warning
+warnings.filterwarnings("ignore", message=".*feature names.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=".*DataFrameGroupBy.apply.*", category=FutureWarning)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -249,23 +254,46 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    # 加载数据（复用 config.py 的切分）
+    # 加载数据（与 main.py 的 _load_data 保持完全一致）
     import sys, os
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    from core.data_loader import SnailDataLoader
-    import config as cfg
+    from core.data_loader import DataLoader
+    from config import DATA_SPLIT
+
+    FEATURE_COLS = [
+        "mom_20d", "mom_60d", "mom_12m_minus_1m",
+        "vol_60d_res", "sp_ratio", "turn_20d",
+        "mom_20d_rank", "mom_60d_rank", "mom_12m_minus_1m_rank",
+        "vol_60d_res_rank", "sp_ratio_rank", "turn_20d_rank",
+    ]
+    LABEL_COL = "label_next_month"
 
     print("📂 连接数据库，加载特征数据 ...")
-    with SnailDataLoader(cfg.DB_PATH) as loader:
-        X_train, y_train = loader.load_split("train")
-        X_val,   y_val   = loader.load_split("val_q1")
-        X_val_q24, y_val_q24 = loader.load_split("val_q2_4")
-        X_test,  y_test  = loader.load_split("test")
+    with DataLoader() as loader:
+        df = loader.get_features()
 
-    print(f"   Train : {len(y_train):6d} 条")
-    print(f"   Val Q1: {len(y_val):6d} 条")
-    print(f"   Val Q2-4: {len(y_val_q24):6d} 条")
-    print(f"   Test  : {len(y_test):6d} 条")
+    # 按 ticker 做滚动 z-score（与 main.py 一致）
+    def _zscore(group):
+        roll = group[FEATURE_COLS].rolling(window=60, min_periods=1)
+        group[FEATURE_COLS] = (group[FEATURE_COLS] - roll.mean()) / (roll.std() + 1e-8)
+        return group
+    df = df.groupby("ticker", group_keys=False).apply(_zscore)
+
+    def _slice(s, e):
+        mask = (df["date"].astype(str) >= str(s)) & (df["date"].astype(str) <= str(e))
+        sub = df[mask]
+        return sub[FEATURE_COLS].values.astype(np.float32), sub[LABEL_COL].values.astype(np.float32)
+
+    sp = DATA_SPLIT
+    X_train,  y_train  = _slice(sp["train_start"],    sp["train_end"])
+    X_val,    y_val    = _slice(sp["val_q1_start"],   sp["val_q1_end"])
+    X_val_q24, y_val_q24 = _slice(sp["val_q2_4_start"], sp["val_q2_4_end"])
+    X_test,   y_test   = _slice(sp["test_start"],     sp["test_end"])
+
+    print(f"   Train   : {len(y_train):6d} 条   {sp['train_start']} ~ {sp['train_end']}")
+    print(f"   Val Q1  : {len(y_val):6d} 条   {sp['val_q1_start']} ~ {sp['val_q1_end']}")
+    print(f"   Val Q2-4: {len(y_val_q24):6d} 条   {sp['val_q2_4_start']} ~ {sp['val_q2_4_end']}")
+    print(f"   Test    : {len(y_test):6d} 条   {sp['test_start']} ~ {sp['test_end']}")
 
     df_results = run_multimodel(
         X_train, y_train,
