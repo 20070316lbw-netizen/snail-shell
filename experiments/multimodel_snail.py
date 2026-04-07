@@ -60,6 +60,13 @@ def _load_backends(names: List[str]) -> Dict[str, BaseQuantileHead]:
         except ImportError:
             print("⚠️  CatBoost 未安装，跳过（pip install catboost）")
 
+    if "mlp" in names:
+        try:
+            from core.mlp_quantile_head import MLPQuantileHead
+            registry["MLP"] = MLPQuantileHead
+        except ImportError:
+            print("⚠️  PyTorch 未安装，跳过（pip install torch>=2.0.0）")
+
     return registry
 
 
@@ -231,8 +238,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="多后端 AS-GSPQR 对比实验")
     parser.add_argument(
         "--backends", nargs="+",
-        default=["lgbm", "xgb", "catboost"],
-        choices=["lgbm", "xgb", "catboost"],
+        default=["lgbm", "xgb", "catboost", "mlp"],
+        choices=["lgbm", "xgb", "catboost", "mlp"],
         help="要测试的后端（默认全部）",
     )
     parser.add_argument(
