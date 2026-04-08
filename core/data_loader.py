@@ -281,7 +281,8 @@ class DataLoader:
                 params.append(index_group)
 
         if limit:
-            query += f" LIMIT {limit}"
+            query += " LIMIT ?"
+            params.append(int(limit))
 
         result = self.conn.execute(query, params).fetchall()
         return [row[0] for row in result]
