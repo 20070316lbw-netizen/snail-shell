@@ -93,7 +93,9 @@ $y = \hat{y}$ 处次梯度为左右导数所围闭区间 $[\tau-1,\ -\tau]$。$\
 
 $$\hat{y}_t^* = \arg\min_{c \in \mathbb{R}} \Bigl\{ \lambda_t (c - \hat{y}_t)^2 + (1 - \lambda_t)(c - a_t)^2 \Bigr\}$$
 
-**结论**：$\hat{y}_t^* = \lambda_t \hat{y}_t + (1 - \lambda_t) a_t \tag{1}$
+**结论**：
+
+$$\hat{y}_t^* = \lambda_t \hat{y}_t + (1 - \lambda_t) a_t \tag{1}$$
 
 **Proof.**
 
