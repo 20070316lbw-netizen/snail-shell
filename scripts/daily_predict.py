@@ -1,7 +1,4 @@
-import duckdb
-import pandas as pd
 import numpy as np
-from datetime import datetime
 import os
 import sys
 
@@ -12,7 +9,6 @@ from core.data_loader import DataLoader
 from core.quantile_head import QuantileHead, FitConfig
 from core.snail_mechanism import SnailMechanism
 from core.spiral_monitor import SpiralMonitor
-from config import DATA_SPLIT, EVALUATION_PARAMS
 
 def generate_report(date, metrics, alerts, top_gainers):
     report_content = f"""# 🐌 Snail-Shell 每日市场预测报告 ({date})
@@ -32,8 +28,10 @@ def generate_report(date, metrics, alerts, top_gainers):
 | 股票代码 | 修正后预测收益率 (%) | 80% 置信区间 [q10, q90] | 备注 |
 | :--- | :--- | :--- | :--- |
 """
-    for _, row in top_gainers.iterrows():
-        report_content += f"| {row['ticker']} | {row['corrected_pred']*100:.2f}% | [{row['q10']*100:.2f}%, {row['q90']*100:.2f}%] | |\n"
+    rows = []
+    for row in top_gainers.itertuples(index=False):
+        rows.append(f"| {row.ticker} | {row.corrected_pred*100:.2f}% | [{row.q10*100:.2f}%, {row.q90*100:.2f}%] | |\n")
+    report_content += "".join(rows)
 
     report_content += "\n## 3. 统计分布总结\n"
     report_content += f"- **样本数量**: {metrics['n_samples']}\n"
@@ -72,7 +70,6 @@ def predict():
     
     # 3. 执行预测
     X_latest = df_latest.iloc[:, 4:16].values.astype(np.float32)
-    labels = df_latest['label_next_month'] # 用于诊断
     
     # 获取锚点和半径
     anchor, radius = qh.predict_anchor_and_radius(X_latest)
