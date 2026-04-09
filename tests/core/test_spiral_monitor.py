@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from core.spiral_monitor import log_spiral_model
+from core.spiral_monitor import log_spiral_model, calculate_expansion_velocity
 
 def test_log_spiral_model_basic():
     """Test basic positive parameters."""
@@ -53,3 +53,44 @@ def test_log_spiral_model_empty():
     result = log_spiral_model(theta, log_A, B)
 
     np.testing.assert_array_equal(result, expected)
+
+def test_calculate_expansion_velocity_basic():
+    """Test basic positive expansion velocity."""
+    rho = np.array([1.0, 2.0, 4.0])
+    theta = np.array([0.0, 0.5, 1.5])
+
+    # Expected v_t = (rho_t - rho_{t-1}) / (theta_t - theta_{t-1} + epsilon)
+    # v[0] = (2.0 - 1.0) / (0.5 - 0.0) = 1.0 / 0.5 = 2.0
+    # v[1] = (4.0 - 2.0) / (1.5 - 0.5) = 2.0 / 1.0 = 2.0
+    # The actual calculation in calculate_expansion_velocity returns velocity which has length n-1
+    epsilon = 1e-8
+    expected = np.array([
+        (2.0 - 1.0) / (0.5 - 0.0 + epsilon),
+        (4.0 - 2.0) / (1.5 - 0.5 + epsilon)
+    ])
+    result = calculate_expansion_velocity(rho, theta, epsilon=epsilon)
+    np.testing.assert_array_almost_equal(result, expected)
+
+def test_calculate_expansion_velocity_short():
+    """Test arrays of length < 2."""
+    # Length 0
+    rho_empty = np.array([])
+    theta_empty = np.array([])
+    result_empty = calculate_expansion_velocity(rho_empty, theta_empty)
+    np.testing.assert_array_equal(result_empty, np.array([]))
+
+    # Length 1
+    rho_single = np.array([1.0])
+    theta_single = np.array([0.5])
+    result_single = calculate_expansion_velocity(rho_single, theta_single)
+    np.testing.assert_array_equal(result_single, np.array([]))
+
+def test_calculate_expansion_velocity_zero_division():
+    """Test zero division handled by epsilon."""
+    rho = np.array([1.0, 2.0])
+    theta = np.array([0.5, 0.5])  # Zero difference in theta
+
+    epsilon = 1e-8
+    expected = np.array([(2.0 - 1.0) / epsilon])
+    result = calculate_expansion_velocity(rho, theta, epsilon=epsilon)
+    np.testing.assert_array_almost_equal(result, expected)
