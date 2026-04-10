@@ -47,7 +47,7 @@ class SnailModel:
         """
         初始化蜗牛壳模型
 
-        Args:
+        参数:
             beta: 软拉回参数
             n_estimators: 树的数量
             learning_rate: 学习率
@@ -79,7 +79,7 @@ class SnailModel:
         """
         训练蜗牛壳模型
 
-        Args:
+        参数:
             X_train: 训练特征
             y_train: 训练标签
             X_val: 验证特征
@@ -94,10 +94,10 @@ class SnailModel:
         """
         预测并应用软拉回
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             包含所有预测的字典
         """
         if not self.is_fitted:
@@ -137,10 +137,10 @@ class SnailModel:
         """
         预测点预测和区间
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             (修正后的点预测, 下界, 上界) 元组
         """
         predictions = self.predict(X)
@@ -170,10 +170,10 @@ def run_snail_experiment(config: ExperimentConfig) -> Dict:
     """
     运行蜗牛壳实验
 
-    Args:
+    参数:
         config: 实验配置数据类
 
-    Returns:
+    返回:
         实验结果字典
     """
     beta_values = config.beta_values
@@ -233,14 +233,14 @@ def select_best_beta(
     使用复合指标：
     Score = W̄ + 10 * max(0, CE - 0.05)
 
-    Args:
+    参数:
         X_train: 训练特征
         y_train: 训练标签
         X_val: 验证特征
         y_val: 验证标签
         beta_candidates: β候选值
 
-    Returns:
+    返回:
         (最优β值, 所有β的评分结果) 元组
     """
     if beta_candidates is None:
@@ -277,7 +277,7 @@ def compare_snail_variants(
     """
     比较不同蜗牛壳变体
 
-    Args:
+    参数:
         X_train: 训练特征
         y_train: 训练标签
         X_val: 验证特征
@@ -285,7 +285,7 @@ def compare_snail_variants(
         X_test: 测试特征
         y_test: 测试标签
 
-    Returns:
+    返回:
         比较结果DataFrame
     """
     beta_values = [0.5, 1.0, 2.0, 5.0]

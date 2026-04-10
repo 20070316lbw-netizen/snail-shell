@@ -21,11 +21,11 @@ def cartesian_to_polar(a: np.ndarray, r: np.ndarray) -> Tuple[np.ndarray, np.nda
     """
     将笛卡尔坐标 (a, r) 转换为极坐标 (ρ, θ)
 
-    Args:
+    参数:
         a: 锚点值（x坐标）
         r: 半径值（y坐标）
 
-    Returns:
+    返回:
         (ρ, θ) 元组
     """
     # 计算极径
@@ -41,12 +41,12 @@ def log_spiral_model(theta: np.ndarray, log_A: float, B: float) -> np.ndarray:
     """
     对数螺线模型：log ρ = log A + B * θ
 
-    Args:
+    参数:
         theta: 极角
         log_A: log(A)
         B: 螺线参数
 
-    Returns:
+    返回:
         log(ρ)
     """
     return log_A + B * theta
@@ -56,11 +56,11 @@ def fit_log_spiral(rho: np.ndarray, theta: np.ndarray) -> Tuple[float, float, fl
     """
     拟合对数螺线
 
-    Args:
+    参数:
         rho: 极径序列
         theta: 极角序列
 
-    Returns:
+    返回:
         (log_A, B, R²) 元组
     """
     # 取对数
@@ -91,12 +91,12 @@ def calculate_expansion_velocity(
 
     公式: v_t = (ρ_t - ρ_{t-1}) / (θ_t - θ_{t-1} + ε)
 
-    Args:
+    参数:
         rho: 极径序列
         theta: 极角序列
         epsilon: 防爆参数
 
-    Returns:
+    返回:
         外扩速度序列
     """
     if len(rho) < 2:
@@ -120,12 +120,12 @@ def rolling_alert(
 
     Alert_t = 1[v_t > μ_{v,t} + 2σ_{v,t}]
 
-    Args:
+    参数:
         velocity: 外扩速度序列
         window: 滚动窗口大小
         threshold_sigma: σ倍数阈值
 
-    Returns:
+    返回:
         预警信号序列（1=预警，0=正常）
     """
     n = len(velocity)
@@ -166,7 +166,7 @@ class SpiralMonitor:
         """
         初始化螺旋监控器
 
-        Args:
+        参数:
             window: 滚动窗口大小
             threshold_sigma: σ倍数阈值
             r_squared_threshold: R²阈值（低于此值时警告）
@@ -187,12 +187,12 @@ class SpiralMonitor:
         """
         分析锚点轨迹的螺旋形态
 
-        Args:
+        参数:
             anchor: 锚点序列
             radius: 半径序列
             timestamps: 时间戳（可选）
 
-        Returns:
+        返回:
             分析结果字典
         """
         # 转换为极坐标
@@ -227,7 +227,7 @@ class SpiralMonitor:
         """
         获取轨迹统计信息
 
-        Returns:
+        返回:
             轨迹统计字典
         """
         if not self.results:
@@ -266,7 +266,7 @@ class SpiralMonitor:
         """
         检查螺旋形态的有效性
 
-        Returns:
+        返回:
             有效性检查结果
         """
         if not self.results:
@@ -293,10 +293,10 @@ class SpiralMonitor:
         """
         基于拟合的螺线预测下一个极径
 
-        Args:
+        参数:
             theta_next: 下一个极角
 
-        Returns:
+        返回:
             预测的极径
         """
         if not self.results:
@@ -319,7 +319,7 @@ def visualize_spiral(
     """
     可视化螺旋轨迹（简单的文本可视化）
 
-    Args:
+    参数:
         anchor: 锚点序列
         radius: 半径序列
         spiral_monitor: 螺旋监控器（可选）

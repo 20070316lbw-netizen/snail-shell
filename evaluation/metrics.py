@@ -26,13 +26,13 @@ def coverage_error(
 
     CE = |(1/N) * Σ I[q10 ≤ y ≤ q90] - 0.8|
 
-    Args:
+    参数:
         y_true: 真实值
         lower: 区间下界
         upper: 区间上界
         target_coverage: 目标覆盖率（默认0.8）
 
-    Returns:
+    返回:
         Coverage Error值
     """
     # 检查是否在区间内
@@ -52,12 +52,12 @@ def actual_coverage(
 
     PICP = (1/N) * Σ I[lower ≤ y_true ≤ upper]
 
-    Args:
+    参数:
         y_true: 真实值
         lower: 区间下界
         upper: 区间上界
 
-    Returns:
+    返回:
         实际覆盖率
     """
     in_interval = (y_true >= lower) & (y_true <= upper)
@@ -76,13 +76,13 @@ def winkler_score(
         (q90 - q10) + 10 * (y - q90)   if y > q90
     }
 
-    Args:
+    参数:
         y_true: 真实值
         lower: 区间下界
         upper: 区间上界
         alpha: 显著性水平（默认0.2，对应80%置信区间）
 
-    Returns:
+    返回:
         平均Winkler Score
     """
     # 区间宽度
@@ -104,11 +104,11 @@ def interval_width(lower: np.ndarray, upper: np.ndarray) -> float:
 
     IW = (1/N) * Σ (q90 - q10)
 
-    Args:
+    参数:
         lower: 区间下界
         upper: 区间上界
 
-    Returns:
+    返回:
         平均区间宽度
     """
     width = upper - lower
@@ -121,11 +121,11 @@ def mean_absolute_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
     MAE = (1/N) * Σ |ŷ* - y|
 
-    Args:
+    参数:
         y_true: 真实值
         y_pred: 预测值
 
-    Returns:
+    返回:
         MAE值
     """
     return np.mean(np.abs(y_true - y_pred))
@@ -137,11 +137,11 @@ def mean_squared_error(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 
     MSE = (1/N) * Σ (ŷ* - y)²
 
-    Args:
+    参数:
         y_true: 真实值
         y_pred: 预测值
 
-    Returns:
+    返回:
         MSE值
     """
     return np.mean((y_true - y_pred) ** 2)
@@ -153,11 +153,11 @@ def rank_ic(y_pred: np.ndarray, y_true: np.ndarray) -> float:
 
     RankIC = Spearman(rank(ŷ*), rank(y))
 
-    Args:
+    参数:
         y_pred: 预测值
         y_true: 真实值
 
-    Returns:
+    返回:
         RankIC值
     """
     return stats.spearmanr(y_pred, y_true).correlation
@@ -169,12 +169,12 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> 
 
     L_q(y, ŷ) = max(q*(y-ŷ), (q-1)*(y-ŷ))
 
-    Args:
+    参数:
         y_true: 真实值
         y_pred: 预测值
         alpha: 分位数参数
 
-    Returns:
+    返回:
         平均Pinball Loss
     """
     residual = y_true - y_pred
@@ -188,11 +188,11 @@ def crossing_rate(q10: np.ndarray, q90: np.ndarray) -> float:
 
     如果分位数交叉（q10 > q90），说明分位数估计质量有限
 
-    Args:
+    参数:
         q10: 10%分位数预测
         q90: 90%分位数预测
 
-    Returns:
+    返回:
         交叉率（0-1之间）
     """
     crossing_mask = q10 > q90
@@ -215,12 +215,12 @@ def composite_score(
     覆盖率向目标 80% 的靠近，使 AS-GSPQR 的 CE 改善能够体现
     在最终评分上。
 
-    Args:
+    参数:
         winkler_mean: 平均 Winkler Score
         coverage_error: Coverage Error（= |实际覆盖率 - 0.8|）
         k: CE 惩罚系数，默认 2.0（可在验证集上调参）
 
-    Returns:
+    返回:
         复合评分（越小越好）
     """
     return winkler_mean + k * coverage_error
@@ -237,7 +237,7 @@ def calculate_all_metrics(
     """
     计算所有评估指标
 
-    Args:
+    参数:
         y_true: 真实值
         point_pred: 点预测值
         lower: 区间下界
@@ -245,7 +245,7 @@ def calculate_all_metrics(
         q10: 10%分位数（可选，用于交叉率计算）
         q90: 90%分位数（可选，用于交叉率计算）
 
-    Returns:
+    返回:
         所有指标的字典
     """
     metrics = {}
@@ -282,11 +282,11 @@ def paired_t_test(
     t = d̄ / (s_d / √n)
     d_t = W_t^Snail - W_t^CP
 
-    Args:
+    参数:
         metric_values_a: 方法A的指标值（如Snail）
         metric_values_b: 方法B的指标值（如CP）
 
-    Returns:
+    返回:
         (t统计量, p值) 元组
     """
     differences = metric_values_a - metric_values_b
@@ -303,13 +303,13 @@ def evaluate_methods(
     """
     评估多个方法
 
-    Args:
+    参数:
         y_true: 真实值
         methods_predictions: 方法名到预测结果的映射
             每个方法包含：point_pred, lower, upper, q10, q90
         include_crossing: 是否包含交叉率
 
-    Returns:
+    返回:
         评估结果DataFrame
     """
     results = []
@@ -402,13 +402,13 @@ def skewness_index(
       SI < 0 → 区间整体偏向下行（r_down > r_up），对应左偏分布
       SI ≈ 0 → 近似对称（等价于 GSPQR 的对称假设）
 
-    Args:
+    参数:
         lower  : 区间下界，形状 (N,)
         upper  : 区间上界，形状 (N,)
         center : 修正中心 ŷ*_t，形状 (N,)
         epsilon: 防零除小量
 
-    Returns:
+    返回:
         平均偏斜指数（标量）
     """
     r_down = center - lower
@@ -428,13 +428,13 @@ def asymmetric_width_stats(
 
     返回上/下半宽的均值、标准差及偏斜指数，便于分析非对称程度。
 
-    Args:
+    参数:
         lower  : 区间下界，形状 (N,)
         upper  : 区间上界，形状 (N,)
         center : 修正中心，形状 (N,)
         epsilon: 防零除小量
 
-    Returns:
+    返回:
         字典，包含：
           mean_r_down, std_r_down  — 下行半宽统计
           mean_r_up,   std_r_up    — 上行半宽统计
@@ -467,14 +467,14 @@ def calculate_all_metrics_asymmetric(
 
     在 calculate_all_metrics 基础上追加 skewness_index 和非对称宽度统计。
 
-    Args:
+    参数:
         y_true     : 真实值
         point_pred : 点预测（修正后中心）
         lower      : 区间下界
         upper      : 区间上界
         center     : 修正中心（若为 None 则用 point_pred 代替）
 
-    Returns:
+    返回:
         指标字典
     """
     if center is None:

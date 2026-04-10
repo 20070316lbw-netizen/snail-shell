@@ -47,12 +47,12 @@ def compute_asymmetric_radii(
     r_down = a_t - q̂_{10,t}   ≥ 0（若分位数无交叉）
     r_up   = q̂_{90,t} - a_t   ≥ 0
 
-    Args:
+    参数:
         anchor : a_t = q̂_{50,t}，形状 (N,)
         q10    : q̂_{10,t}，形状 (N,)
         q90    : q̂_{90,t}，形状 (N,)
 
-    Returns:
+    返回:
         (r_down, r_up)，各形状 (N,)
     """
     r_down = anchor - q10
@@ -79,14 +79,14 @@ def directional_gate(
               r_down  if δ_t ≤ 0   (看空分歧，用下行不确定性衡量)
     λ_t = exp(-β · |δ_t| / r_dir_t)
 
-    Args:
+    参数:
         delta  : δ_t = ŷ_t - a_t，形状 (N,)
         r_down : 下行半径，形状 (N,)
         r_up   : 上行半径，形状 (N,)
         beta   : 拉回强度参数 β ≥ 0
         epsilon: 防零除的数值下界
 
-    Returns:
+    返回:
         (lambda_t, r_dir)：门控系数和所选方向半径，各形状 (N,)
     """
     # 选择方向半径
@@ -117,7 +117,7 @@ def asymmetric_soft_pullback(
     """
     完整非对称软拉回（单次 β 调用）
 
-    Args:
+    参数:
         point_pred : ŷ_t（MSE 模型输出），形状 (N,)
         anchor     : a_t = q̂_{50,t}，形状 (N,)
         q10        : q̂_{10,t}，形状 (N,)
@@ -125,7 +125,7 @@ def asymmetric_soft_pullback(
         beta       : 拉回强度 β ≥ 0
         epsilon    : 数值安全小量
 
-    Returns:
+    返回:
         (corrected_center, lower, upper, diagnostics)
         - corrected_center : ŷ*_t，形状 (N,)
         - lower            : ŷ*_t - r_down，形状 (N,)
@@ -209,7 +209,7 @@ class AsymmetricSnailMechanism:
         """
         单次非对称软拉回
 
-        Returns:
+        返回:
             (corrected_center, lower, upper, diagnostics)
         """
         return asymmetric_soft_pullback(point_pred, anchor, q10, q90, beta)
@@ -225,7 +225,7 @@ class AsymmetricSnailMechanism:
         """
         扫描所有 β 值
 
-        Returns:
+        返回:
             {beta: (corrected_center, lower, upper, diagnostics)}
         """
         results = {}
@@ -249,7 +249,7 @@ class AsymmetricSnailMechanism:
 
         复合评分：Score = W̄ + 10 · max(0, CE - 0.05)
 
-        Returns:
+        返回:
             (best_beta, {beta: score_info})
         """
         if scoring_func is None:

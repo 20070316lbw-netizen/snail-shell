@@ -162,7 +162,7 @@ def run_asymmetric_experiment(config: AsymmetricExperimentConfig) -> Dict:
     所有 β 共享同一组训练好的分位数模型（Stage 1 只训练一次），
     β 扫描在推断阶段完成，无需重复训练。
 
-    Returns:
+    返回:
         {
           "AS-Snail-{β}": {
             "corrected_center": ...,
@@ -256,12 +256,12 @@ def select_best_beta_asymmetric(
 
     使用复合评分：Score = W̄ + 10 · max(0, CE - 0.05)
 
-    Args:
+    参数:
         qh             : 已训练的 QuantileHead
         X_val / y_val  : 验证集特征和标签
         beta_candidates: β 候选列表
 
-    Returns:
+    返回:
         (best_beta, beta_scores_dict)
     """
     if beta_candidates is None:
@@ -291,12 +291,12 @@ def compare_symmetric_vs_asymmetric(
     """
     生成对称 vs 非对称的完整对比 DataFrame
 
-    Args:
+    参数:
         y_test      : 测试集真实标签
         sym_results : {"Snail-1.0": {"point_pred", "lower", "upper", ...}, ...}
         asym_results: {"AS-Snail-1.0": {"corrected_center", "lower", "upper", ...}, ...}
 
-    Returns:
+    返回:
         pd.DataFrame，含 AC / CE / Winkler / Width / MAE / RankIC / skewness_index
     """
     rows = []

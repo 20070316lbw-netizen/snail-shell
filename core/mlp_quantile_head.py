@@ -87,7 +87,7 @@ class MLPQuantileHead(BaseQuantileHead):
         random_state    : int = 42,
     ):
         """
-        Args:
+        参数:
             hidden_dims  : 隐藏层宽度列表，默认 [256, 128, 64]
             dropout      : Dropout 概率
             lr           : Adam 学习率

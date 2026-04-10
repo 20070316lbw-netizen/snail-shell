@@ -49,7 +49,7 @@ class BaseQuantileHead(ABC):
         """
         训练四个分位数模型：MSE / q10 / q50 / q90
 
-        Args:
+        参数:
             config: FitConfig 实例，包含训练集和可选验证集
         """
         ...
@@ -60,10 +60,10 @@ class BaseQuantileHead(ABC):
         """
         推断所有分位数和点预测
 
-        Args:
+        参数:
             X: 特征矩阵，形状 (N, F)
 
-        Returns:
+        返回:
             字典，必须包含以下键：
               "point" : MSE 点预测，形状 (N,)
               "q10"   : 10% 分位数，形状 (N,)
@@ -82,7 +82,7 @@ class BaseQuantileHead(ABC):
         a_t = q̂_{50,t}
         r_t = (q̂_{90,t} - q̂_{10,t}) / 2
 
-        Returns:
+        返回:
             (anchor, radius)，各形状 (N,)
         """
         preds  = self.predict(X)

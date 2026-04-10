@@ -173,7 +173,7 @@ def run_multimodel(
     """
     多后端 AS-GSPQR 对比实验主入口。
 
-    Args:
+    参数:
         X_train/y_train : 训练集（早停验证）
         X_val/y_val     : 早停验证集
         X_test/y_test   : 测试集（最终评估）
@@ -182,7 +182,7 @@ def run_multimodel(
         beta_values     : β 网格，默认 [0.5, 1.0, 2.0, 5.0]
         backends        : 后端列表，默认 ["lgbm", "xgb", "catboost"]
 
-    Returns:
+    返回:
         汇总结果 DataFrame
     """
     if beta_values is None:

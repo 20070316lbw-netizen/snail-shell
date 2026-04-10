@@ -17,6 +17,7 @@ main.py - snail-shell 统一实验入口 v2.1
   monitor     训练模型并输出螺旋监控分析
   visualize   从已有 CSV 结果生成 Pareto / 对比柱状图
   check       数据质量 & 分位数交叉率快速健康检查
+  predict     运行每日预测并生成 Markdown 报告
 
 示例：
   python main.py compare                                  # 完整对比（全部基线 + 全部蜗牛壳）
@@ -31,6 +32,7 @@ main.py - snail-shell 统一实验入口 v2.1
   python main.py check                                    # 数据健康检查（交叉率等）
   python main.py -v compare                               # 详细日志模式
   python main.py -q compare                               # 静默模式（仅结果表格）
+  python main.py predict                                  # 运行每日预测
 """
 
 import argparse
@@ -702,6 +704,19 @@ def cmd_check(args, ctx):
     print("\n✅ 健康检查完成")
 
 
+# ── 子命令：predict ──────────────────────────────────────────────────────────
+def cmd_predict(args, ctx):
+    """运行每日预测并生成 Markdown 报告。"""
+    print("\n🐌 snail-shell — 每日预测")
+    print("=" * 60)
+    try:
+        from scripts.daily_predict import predict
+        predict()
+    except ImportError as e:
+        print(f"❌ 导入 daily_predict 失败: {e}")
+        sys.exit(1)
+
+
 # ── CLI 解析 ───────────────────────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -777,6 +792,9 @@ def build_parser() -> argparse.ArgumentParser:
     # ── check（新增）─────────────────────────────────────────────
     subs.add_parser("check", help="数据质量 & 分位数交叉率快速健康检查")
 
+    # ── predict ──────────────────────────────────────────────────
+    subs.add_parser("predict", help="执行每日预测生成最新日期的推荐报告")
+
     return parser
 
 
@@ -821,6 +839,7 @@ def main():
         "monitor":     cmd_monitor,
         "visualize":   cmd_visualize,
         "check":       cmd_check,
+        "predict":     cmd_predict,
     }
     dispatch[args.command](args, ctx)
 

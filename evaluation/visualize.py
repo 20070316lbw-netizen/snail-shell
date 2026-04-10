@@ -28,7 +28,7 @@ def plot_pareto_curve(
     所有方法在Coverage Error vs Width空间的散点图
     目标是左下角（覆盖误差小且区间窄）
 
-    Args:
+    参数:
         methods_data: 方法名到预测结果的映射
         y_true: 真实值
         target_coverage: 目标覆盖率
@@ -106,7 +106,7 @@ def plot_time_dynamics(
 
     Winkler Score vs Time，重点观察regime切换期间的稳定性对比
 
-    Args:
+    参数:
         y_true: 真实值
         methods_predictions: 方法名到预测结果的映射
         timestamps: 时间戳（可选）
@@ -189,7 +189,7 @@ def plot_beta_comparison(
 
     显示不同β值下的评估指标
 
-    Args:
+    参数:
         beta_scores: β值到评分结果的映射
         figsize: 图形大小
     """
@@ -253,7 +253,7 @@ def plot_method_comparison(
     """
     绘制方法比较图
 
-    Args:
+    参数:
         methods_metrics: 包含方法评估指标的DataFrame
         figsize: 图形大小
     """
@@ -322,7 +322,7 @@ def plot_spiral_trajectory(
     """
     绘制螺旋轨迹
 
-    Args:
+    参数:
         anchor: 锚点序列
         radius: 半径序列
         alerts: 预警信号（可选）
@@ -389,7 +389,7 @@ def plot_regression_diagnostics(
     """
     绘制回归诊断图
 
-    Args:
+    参数:
         y_true: 真实值
         y_pred: 预测值
         residuals: 残差（可选）

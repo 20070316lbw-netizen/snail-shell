@@ -30,13 +30,13 @@ def soft_pullback(
     α_t = exp(-β * |ŷ_t - a_t| / r_t)
     ŷ_t* = α_t * ŷ_t + (1 - α_t) * a_t
 
-    Args:
+    参数:
         point_pred: 点预测值 (ŷ_t)
         anchor: 锚点值 (a_t)
         radius: 可信圆半径 (r_t)
         beta: 插值控制器（控制拉回强度）
 
-    Returns:
+    返回:
         修正后的预测值 (ŷ_t*)
     """
     # 计算α_t（含 β=∞ 安全处理，委托给 calculate_alpha 避免逻辑重复）
@@ -54,13 +54,13 @@ def calculate_alpha(
     """
     计算α_t值
 
-    Args:
+    参数:
         point_pred: 点预测值
         anchor: 锚点值
         radius: 可信圆半径
         beta: 插值控制器
 
-    Returns:
+    返回:
         α_t值
     """
     epsilon = 1e-8
@@ -95,7 +95,7 @@ class SnailMechanism:
         """
         初始化蜗牛壳机制
 
-        Args:
+        参数:
             beta_values: β参数列表，用于扫描
             crossing_threshold: 交叉率阈值警告线
         """
@@ -118,13 +118,13 @@ class SnailMechanism:
         """
         应用软拉回机制
 
-        Args:
+        参数:
             point_pred: 点预测值
             anchor: 锚点值
             radius: 可信圆半径
             beta: 插值控制器
 
-        Returns:
+        返回:
             (修正后的预测, 诊断信息) 元组
         """
         # 计算α值（含 β=∞ 安全处理）
@@ -159,12 +159,12 @@ class SnailMechanism:
         """
         扫描不同β值的效果
 
-        Args:
+        参数:
             point_pred: 点预测值
             anchor: 锚点值
             radius: 可信圆半径
 
-        Returns:
+        返回:
             β值到（修正预测, 诊断信息）的映射
         """
         results = {}
@@ -196,14 +196,14 @@ class SnailMechanism:
         - W̄: 平均Winkler Score
         - CE: Coverage Error
 
-        Args:
+        参数:
             point_pred: 点预测值
             anchor: 锚点值
             radius: 可信圆半径
             y_true: 真实值
             scoring_func: 自定义评分函数
 
-        Returns:
+        返回:
             (最优β值, 所有β的评分结果) 元组
         """
         # 如果没有提供评分函数，使用默认的
@@ -260,11 +260,11 @@ class SnailMechanism:
         """
         检查分位数交叉情况
 
-        Args:
+        参数:
             q10: 10%分位数预测
             q90: 90%分位数预测
 
-        Returns:
+        返回:
             交叉统计信息
         """
         crossing_rate_value = crossing_rate(q10, q90)

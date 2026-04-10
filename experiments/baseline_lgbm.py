@@ -45,7 +45,7 @@ class ResidualBaseline:
         """
         初始化Residual基线
 
-        Args:
+        参数:
             quantile: 分位数（默认1.28对应80%置信区间）
             n_estimators: 树的数量
             learning_rate: 学习率
@@ -70,7 +70,7 @@ class ResidualBaseline:
         """
         训练模型并计算残差标准差
 
-        Args:
+        参数:
             X_train: 训练特征
             y_train: 训练标签
             X_val: 验证特征（推荐提供，用于无偏估计残差 std）
@@ -96,10 +96,10 @@ class ResidualBaseline:
         """
         预测点预测和区间
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             (点预测, 下界, 上界) 元组
         """
         point_pred = self.model.predict(X)
@@ -125,7 +125,7 @@ class ConformalPredictionBaseline:
         """
         初始化CP基线
 
-        Args:
+        参数:
             alpha: 显著性水平（1-alpha=置信水平）
             calibration_split: 校准集大小（可选）
         """
@@ -154,7 +154,7 @@ class ConformalPredictionBaseline:
         """
         训练模型并在校准集上计算残差分位数
 
-        Args:
+        参数:
             X_train: 训练特征
             y_train: 训练标签
             X_cal: 校准特征
@@ -180,10 +180,10 @@ class ConformalPredictionBaseline:
         """
         预测点预测和区间
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             (点预测, 下界, 上界) 元组
         """
         point_pred = self.q50_model.predict(X)
@@ -205,7 +205,7 @@ class QRBaseline:
         """
         初始化QR基线
 
-        Args:
+        参数:
             n_estimators: 树的数量
             learning_rate: 学习率
         """
@@ -223,7 +223,7 @@ class QRBaseline:
         """
         训练四模型分位数回归
 
-        Args:
+        参数:
             X_train: 训练特征
             y_train: 训练标签
             X_val: 验证特征
@@ -238,10 +238,10 @@ class QRBaseline:
         """
         预测点预测和区间
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             (点预测, 下界, 上界) 元组
         """
         predictions = self.quantile_head.predict(X)
@@ -267,7 +267,7 @@ class Q50OnlyBaseline:
         """
         初始化Q50-only基线
 
-        Args:
+        参数:
             n_estimators: 树的数量
             learning_rate: 学习率
         """
@@ -285,7 +285,7 @@ class Q50OnlyBaseline:
         """
         训练四模型分位数回归
 
-        Args:
+        参数:
             X_train: 训练特征
             y_train: 训练标签
             X_val: 验证特征
@@ -327,7 +327,7 @@ def run_baseline_experiment(
     """
     运行所有基线实验
 
-    Args:
+    参数:
         X_train: 训练特征
         y_train: 训练标签
         X_val: 验证特征
@@ -336,7 +336,7 @@ def run_baseline_experiment(
         y_test: 测试标签
         baseline_methods: 基线方法列表
 
-    Returns:
+    返回:
         实验结果字典
     """
     if baseline_methods is None:

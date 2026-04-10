@@ -23,12 +23,12 @@ def pinball_loss(y_true: np.ndarray, y_pred: np.ndarray, alpha: float = 0.5) -> 
 
     公式: L_q(y, ŷ) = max(q*(y-ŷ), (q-1)*(y-ŷ))
 
-    Args:
+    参数:
         y_true: 真实值
         y_pred: 预测值
         alpha: 分位数参数（0-1之间）
 
-    Returns:
+    返回:
         Pinball Loss值
     """
     residual = y_true - y_pred
@@ -59,7 +59,7 @@ class QuantileHead(BaseQuantileHead):
         """
         初始化分位数回归头
 
-        Args:
+        参数:
             params: LightGBM参数字典
             n_estimators: 树的数量
             learning_rate: 学习率
@@ -107,11 +107,11 @@ class QuantileHead(BaseQuantileHead):
         """
         创建LightGBM模型
 
-        Args:
+        参数:
             objective: 目标函数类型
             alpha: 分位数参数（仅用于quantile目标）
 
-        Returns:
+        返回:
             LightGBM回归器
         """
         params = self.default_params.copy()
@@ -135,7 +135,7 @@ class QuantileHead(BaseQuantileHead):
         """
         训练四个模型
 
-        Args:
+        参数:
             config: 训练配置类实例
         """
         X_train, y_train = config.X_train, config.y_train
@@ -204,10 +204,10 @@ class QuantileHead(BaseQuantileHead):
         """
         预测所有分位数和点预测
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             包含所有预测的字典
         """
         if not self.is_fitted:
@@ -232,10 +232,10 @@ class QuantileHead(BaseQuantileHead):
         锚点: a_t = ŷ_{q50,t}
         半径: r_t = (ŷ_{q90,t} - ŷ_{q10,t}) / 2
 
-        Args:
+        参数:
             X: 特征矩阵
 
-        Returns:
+        返回:
             (锚点, 半径) 元组
         """
         predictions = self.predict(X)
@@ -249,7 +249,7 @@ class QuantileHead(BaseQuantileHead):
         """
         获取模型信息
 
-        Returns:
+        返回:
             模型信息字典
         """
         if not self.is_fitted:

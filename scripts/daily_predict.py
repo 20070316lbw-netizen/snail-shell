@@ -2,7 +2,7 @@ import numpy as np
 import os
 import sys
 
-# Ensure project root is in sys.path
+# 确保项目根目录在 sys.path 中
 sys.path.append(os.getcwd())
 
 from core.data_loader import DataLoader
@@ -54,14 +54,14 @@ def predict():
         df = loader.get_features()
     
     if df.empty:
-        print("No data found in database.")
+        print("数据库中没有找到数据。")
         return
 
     # 获取最新日期
     latest_date = str(df['date'].max())
     df_latest = df[df['date'].astype(str) == latest_date].copy()
     
-    print(f"Predicting for {latest_date}...")
+    print(f"正在为 {latest_date} 生成预测...")
 
     # 2. 训练/加载模型 (此处为了示例，每次运行简单训练)
     # 实际生产中应保存并加载 .pkl
@@ -108,7 +108,7 @@ def predict():
     
     # 5. 生成报告
     report_path = generate_report(latest_date, metrics, res['alerts'], top_gainers)
-    print(f"Report generated: {report_path}")
+    print(f"报告已生成: {report_path}")
 
 if __name__ == "__main__":
     predict()

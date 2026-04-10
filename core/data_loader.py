@@ -23,7 +23,7 @@ class DataLoader:
         """
         初始化数据加载器
 
-        Args:
+        参数:
             db_path: 数据库路径
         """
         self.db_path = db_path
@@ -60,13 +60,13 @@ class DataLoader:
         """
         获取特征数据
 
-        Args:
+        参数:
             ticker: 股票代码（可选）
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
             index_group: 指数组（可选，如'HS300'或'ZZ500'）
 
-        Returns:
+        返回:
             特征数据DataFrame
         """
         if not self.conn:
@@ -102,12 +102,12 @@ class DataLoader:
         """
         获取新闻情感数据
 
-        Args:
+        参数:
             ticker: 股票代码（可选）
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
 
-        Returns:
+        返回:
             新闻情感数据DataFrame
         """
         if not self.conn:
@@ -137,11 +137,11 @@ class DataLoader:
         """
         获取已标注的新闻数据
 
-        Args:
+        参数:
             ticker: 股票代码（可选）
             news_type: 新闻类型（可选）
 
-        Returns:
+        返回:
             已标注新闻DataFrame
         """
         if not self.conn:
@@ -171,12 +171,12 @@ class DataLoader:
         """
         获取Alpha因子得分
 
-        Args:
+        参数:
             ticker: 股票代码（可选）
             start_date: 开始日期（可选）
             end_date: 结束日期（可选）
 
-        Returns:
+        返回:
             Alpha得分DataFrame
         """
         if not self.conn:
@@ -206,12 +206,12 @@ class DataLoader:
         """
         准备训练数据
 
-        Args:
+        参数:
             target_date: 目标日期
             horizon: 预测期数（默认1天）
             index_group: 指数组（默认HS300）
 
-        Returns:
+        返回:
             (特征DataFrame, 特征矩阵 X, 标签数组 y) —— 共三个返回值
         """
         if not self.conn:
@@ -256,11 +256,11 @@ class DataLoader:
         """
         获取可用的股票代码列表
 
-        Args:
+        参数:
             index_group: 指数组（可选，如果字段为空则忽略）
             limit: 限制返回数量（可选）
 
-        Returns:
+        返回:
             股票代码列表
         """
         if not self.conn:
@@ -291,7 +291,7 @@ class DataLoader:
         """
         获取数据日期范围
 
-        Returns:
+        返回:
             (开始日期, 结束日期) 元组
         """
         if not self.conn:
