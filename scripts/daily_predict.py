@@ -28,14 +28,18 @@ def generate_report(date, metrics, alerts, top_gainers):
 | 股票代码 | 修正后预测收益率 (%) | 80% 置信区间 [q10, q90] | 备注 |
 | :--- | :--- | :--- | :--- |
 """
-    rows = []
-    for row in top_gainers.itertuples(index=False):
-        rows.append(f"| {row.ticker} | {row.corrected_pred*100:.2f}% | [{row.q10*100:.2f}%, {row.q90*100:.2f}%] | |\n")
-    report_content += "".join(rows)
+    rows = [
+        f"| {row.ticker} | {row.corrected_pred*100:.2f}% | [{row.q10*100:.2f}%, {row.q90*100:.2f}%] | |\n"
+        for row in top_gainers.itertuples(index=False)
+    ]
 
-    report_content += "\n## 3. 统计分布总结\n"
-    report_content += f"- **样本数量**: {metrics['n_samples']}\n"
-    report_content += f"- **平均预测半径**: {metrics['mean_radius']*100:.2f}%\n"
+    rows.append(
+        "\n## 3. 统计分布总结\n"
+        f"- **样本数量**: {metrics['n_samples']}\n"
+        f"- **平均预测半径**: {metrics['mean_radius']*100:.2f}%\n"
+    )
+
+    report_content += "".join(rows)
     
     report_path = f"reports/daily/report_{date.replace('-', '')}.md"
     os.makedirs("reports/daily", exist_ok=True)
