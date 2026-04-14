@@ -6,8 +6,9 @@ base_quantile_head.py - 分位数回归头抽象基类
 
 接口约定：
   fit(config: FitConfig)            训练四个分位数模型
-  predict(X) -> Dict                返回 point / q10 / q50 / q90
+  predict(X) -> Dict                返回 point / q10 / q50 / q90（原始值，可能含交叉）
   predict_anchor_and_radius(X)      返回 (a_t, r_t)，供 SnailMechanism 使用
+                                    内部自动修复分位数交叉，保证 radius ≥ 0
 """
 
 from abc import ABC, abstractmethod
@@ -15,6 +16,8 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
 import numpy as np
+
+from core.quantile_crossing_fix import fix_quantile_crossing
 
 
 # ---------------------------------------------------------------------------
@@ -82,12 +85,19 @@ class BaseQuantileHead(ABC):
         a_t = q̂_{50,t}
         r_t = (q̂_{90,t} - q̂_{10,t}) / 2
 
+        注意：在计算 radius 之前会自动调用 fix_quantile_crossing()，
+        保证 q10 ≤ q50 ≤ q90，从而 radius ≥ 0 严格成立。
+        predict() 的原始输出不受影响，可继续用于交叉率诊断。
+
         返回:
-            (anchor, radius)，各形状 (N,)
+            (anchor, radius)，各形状 (N,)，radius ≥ 0
         """
-        preds  = self.predict(X)
+        preds = self.predict(X)
+        q10_fixed, _, q90_fixed = fix_quantile_crossing(
+            preds["q10"], preds["q50"], preds["q90"]
+        )
         anchor = preds["q50"]
-        radius = (preds["q90"] - preds["q10"]) / 2
+        radius = (q90_fixed - q10_fixed) / 2
         return anchor, radius
 
     # ------------------------------------------------------------------
