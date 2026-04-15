@@ -245,7 +245,8 @@ def _print_ce_improvement(df_asym: pd.DataFrame):
     CE_THRESHOLD = 0.05
     any_printed = False
 
-    for asym_name, asym_row in asym_rows.iterrows():
+    for row in asym_rows.itertuples():
+        asym_name = row.Index
         # 匹配：AS-Snail-1.0 → Snail-1.0
         beta_str = asym_name[len("AS-"):]          # e.g. "Snail-1.0"
         sym_name = beta_str                          # "Snail-1.0"
@@ -256,8 +257,8 @@ def _print_ce_improvement(df_asym: pd.DataFrame):
                 continue
             sym_name = sym_rows["coverage_error"].idxmin()
 
-        ce_sym  = sym_rows.loc[sym_name, "coverage_error"]
-        ce_asym = asym_row["coverage_error"]
+        ce_sym  = sym_rows.at[sym_name, "coverage_error"]
+        ce_asym = row.coverage_error
 
         delta    = ce_sym - ce_asym                 # 正值 = CE 下降（改善）
         rel_pct  = (delta / ce_sym * 100) if ce_sym > 1e-9 else 0.0
@@ -604,10 +605,10 @@ def cmd_visualize(args, ctx):
 
         fig, ax = plt.subplots(figsize=(10, 7))
         snail_idx = 0
-        for _, row in df.iterrows():
-            method = row.get("Method", "?")
-            iw = row.get("interval_width", np.nan)
-            ce = row.get("coverage_error", np.nan)
+        for row in df.itertuples(index=False):
+            method = getattr(row, "Method", "?")
+            iw = getattr(row, "interval_width", np.nan)
+            ce = getattr(row, "coverage_error", np.nan)
             color = palette.get(method, snail_colors[snail_idx % len(snail_colors)])
             if method not in palette:
                 snail_idx += 1
