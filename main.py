@@ -1,5 +1,5 @@
 """
-main.py - snail-shell 统一实验入口 v2.1
+main.py - snail-shell 统一实验入口 v2.2
 
 用法：
   python main.py [全局参数] <命令> [命令参数]
@@ -18,6 +18,8 @@ main.py - snail-shell 统一实验入口 v2.1
   visualize   从已有 CSV 结果生成 Pareto / 对比柱状图
   check       数据质量 & 分位数交叉率快速健康检查
   predict     运行每日预测并生成 Markdown 报告
+  fetch-data  数据抓取与维护（akshare 月频，支持初始化/增量更新）
+  hurst       计算 Hurst 指数特征并写回 features_cn
 
 示例：
   python main.py compare                                  # 完整对比（全部基线 + 全部蜗牛壳）
@@ -33,6 +35,13 @@ main.py - snail-shell 统一实验入口 v2.1
   python main.py -v compare                               # 详细日志模式
   python main.py -q compare                               # 静默模式（仅结果表格）
   python main.py predict                                  # 运行每日预测
+  python main.py fetch-data status                        # 查看数据库覆盖情况
+  python main.py fetch-data init --index HS300,ZZ500      # 初始化 HS300+ZZ500 全量数据
+  python main.py fetch-data init --index HS300 --start 2016-01-01 --end 2020-12-31
+  python main.py fetch-data update                        # 增量更新到今天
+  python main.py hurst                                    # 计算 Hurst 特征（默认窗口 24m/36m）
+  python main.py hurst --windows 24 36 48                 # 自定义窗口
+  python main.py hurst --dry-run                          # 仅统计，不写库
 """
 
 import argparse
@@ -718,15 +727,175 @@ def cmd_predict(args, ctx):
         sys.exit(1)
 
 
+# ── 子命令：fetch-data ────────────────────────────────────────────────────────
+def cmd_fetch_data(args, ctx):
+    """数据抓取与维护（akshare 月频数据）。"""
+    from scripts.fetch_data import (
+        run_status, run_init, run_update,
+        _print_status, _print_stats,
+    )
+
+    mode = getattr(args, "fetch_mode", "status")
+
+    if mode == "status":
+        print("\n🐌 snail-shell — 数据库状态")
+        print("=" * 60)
+        info = run_status()
+        _print_status(info)
+
+    elif mode == "init":
+        indices = [i.strip().upper() for i in args.index.split(",")]
+        print(f"\n🐌 snail-shell — 数据初始化")
+        print("=" * 60)
+        print(f"  指数    : {', '.join(indices)}")
+        print(f"  起始日期: {args.start}")
+        print(f"  截止日期: {args.end or '今天'}")
+        print(f"  请求间隔: {args.delay}s / 只\n")
+        stats = run_init(
+            index_names=indices,
+            start_date=args.start,
+            end_date=args.end,
+            delay=args.delay,
+        )
+        print("\n✅ 初始化完成")
+        _print_stats(stats)
+
+    elif mode == "update":
+        print("\n🐌 snail-shell — 增量更新")
+        print("=" * 60)
+        stats = run_update(delay=args.delay)
+        if "message" in stats:
+            print(f"  ✅ {stats['message']}")
+        elif "error" in stats:
+            print(f"  ❌ {stats['error']}")
+        else:
+            print("\n✅ 更新完成")
+            _print_stats(stats)
+
+
+# ── 子命令：hurst ─────────────────────────────────────────────────────────────
+def cmd_hurst(args, ctx):
+    """
+    计算 Hurst 指数特征并写回 features_cn。
+
+    对 features_cn 中每只股票的 mom_20d 序列（月频）滚动计算 Hurst，
+    结果写入 hurst_{N}m 列（例如 hurst_24m, hurst_36m）。
+    使用 DFA 算法（--method dfa）或 R/S 分析（--method rs）。
+    --dry-run 模式仅输出统计，不修改数据库。
+    """
+    import duckdb
+    from core.hurst_features import compute_hurst_features, summarize_hurst_features
+
+    windows  = args.windows
+    method   = args.method
+    dry_run  = args.dry_run
+    db_path  = ctx["get_project_info"]()["database_path"]
+
+    print(f"\n🐌 snail-shell — Hurst 特征计算")
+    print("=" * 60)
+    print(f"  窗口   : {windows} 个月")
+    print(f"  算法   : {method.upper()}")
+    print(f"  模式   : {'dry-run（不写库）' if dry_run else '正式写入'}\n")
+
+    # ── 读取 features_cn ──────────────────────────────────────────────────────
+    print("📂 加载 features_cn ...")
+    con_ro = duckdb.connect(db_path, read_only=True)
+    try:
+        df = con_ro.execute(
+            "SELECT ticker, date, mom_20d FROM features_cn ORDER BY ticker, date"
+        ).fetchdf()
+    finally:
+        con_ro.close()
+
+    if df.empty:
+        print("❌ features_cn 为空，请先执行 fetch-data init")
+        return
+
+    print(f"  加载 {len(df):,} 行，{df['ticker'].nunique():,} 只股票\n")
+
+    # ── 计算 Hurst ────────────────────────────────────────────────────────────
+    print("⚙️  计算滚动 Hurst ...")
+    df_hurst = compute_hurst_features(
+        df,
+        windows=windows,
+        method=method,
+        returns_col="mom_20d",
+    )
+
+    # ── 统计摘要 ──────────────────────────────────────────────────────────────
+    summary = summarize_hurst_features(df_hurst, windows=windows)
+    print("\n📊 Hurst 特征统计：")
+    sep = "─" * 70
+    print(sep)
+    print(f"  {'列名':<14} {'有效行':>8} {'NaN率':>8} {'均值':>8} "
+          f"{'标准差':>8} {'P25':>8} {'P50':>8} {'P75':>8}")
+    print(sep)
+    for col, st in summary.items():
+        if st["count"] == 0:
+            print(f"  {col:<14} {'—':>8}")
+            continue
+        print(f"  {col:<14} {st['count']:>8,} {st['nan_rate']:>7.1%} "
+              f"{st['mean']:>8.3f} {st['std']:>8.3f} "
+              f"{st['p25']:>8.3f} {st['p50']:>8.3f} {st['p75']:>8.3f}")
+    print(sep)
+
+    if dry_run:
+        print("\n  dry-run 模式，跳过写库")
+        return
+
+    # ── 写回数据库 ────────────────────────────────────────────────────────────
+    print("\n💾 写入数据库 ...")
+    con = duckdb.connect(db_path)
+    try:
+        # 添加列（若不存在）
+        for w in windows:
+            col = f"hurst_{w}m"
+            try:
+                con.execute(f"ALTER TABLE features_cn ADD COLUMN {col} DOUBLE")
+                print(f"  新增列: {col}")
+            except Exception:
+                pass  # 列已存在，忽略
+
+        # 批量 UPDATE（用 DuckDB join 方式）
+        hurst_cols = [f"hurst_{w}m" for w in windows]
+        update_df  = df_hurst[["ticker", "date"] + hurst_cols].copy()
+        update_df["date"] = pd.to_datetime(update_df["date"]).dt.date
+
+        con.register("_hurst_staging", update_df)
+        set_clause = ", ".join(
+            f"features_cn.{c} = s.{c}" for c in hurst_cols
+        )
+        con.execute(f"""
+            UPDATE features_cn
+            SET {set_clause}
+            FROM _hurst_staging s
+            WHERE features_cn.ticker = s.ticker
+              AND features_cn.date   = s.date
+        """)
+        con.unregister("_hurst_staging")
+
+        # 验证写入
+        sample_col = hurst_cols[0]
+        n_written = con.execute(
+            f"SELECT COUNT(*) FROM features_cn WHERE {sample_col} IS NOT NULL"
+        ).fetchone()[0]
+        print(f"  ✅ {sample_col} 非空行: {n_written:,}")
+
+    finally:
+        con.close()
+
+    print("\n✅ Hurst 特征写入完成")
+
+
 # ── CLI 解析 ───────────────────────────────────────────────────────────────────
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="snail-shell",
-        description="🐌 A股日频收益率区间预测框架 snail-shell v2.1",
+        description="🐌 A股日频收益率区间预测框架 snail-shell v2.2",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__,
     )
-    parser.add_argument("--version", action="version", version="snail-shell 2.1")
+    parser.add_argument("--version", action="version", version="snail-shell 2.2")
 
     # ── 全局日志控制 ──
     g = parser.add_mutually_exclusive_group()
@@ -796,6 +965,62 @@ def build_parser() -> argparse.ArgumentParser:
     # ── predict ──────────────────────────────────────────────────
     subs.add_parser("predict", help="执行每日预测生成最新日期的推荐报告")
 
+    # ── fetch-data ────────────────────────────────────────────────
+    p_fd = subs.add_parser(
+        "fetch-data",
+        help="数据抓取与维护（akshare 月频，支持初始化/增量更新）",
+    )
+    fd_subs = p_fd.add_subparsers(dest="fetch_mode", metavar="<模式>")
+    fd_subs.required = True
+
+    fd_subs.add_parser("status", help="显示当前数据库覆盖情况及缺口年份")
+
+    p_fd_init = fd_subs.add_parser(
+        "init", help="全量初始化（从 akshare 拉取指数月频历史）"
+    )
+    p_fd_init.add_argument(
+        "--index", default="HS300,ZZ500", metavar="LIST",
+        help="逗号分隔指数列表，如 HS300,ZZ500（默认 HS300,ZZ500）",
+    )
+    p_fd_init.add_argument(
+        "--start", default="2014-01-01", metavar="YYYY-MM-DD",
+        help="起始日期（默认 2014-01-01）",
+    )
+    p_fd_init.add_argument(
+        "--end", default=None, metavar="YYYY-MM-DD",
+        help="截止日期（默认今天）",
+    )
+    p_fd_init.add_argument(
+        "--delay", type=float, default=0.35, metavar="SEC",
+        help="每次请求间隔秒数（默认 0.35）",
+    )
+
+    p_fd_upd = fd_subs.add_parser(
+        "update", help="增量更新（从数据库最新日期拉取到今天）"
+    )
+    p_fd_upd.add_argument(
+        "--delay", type=float, default=0.35, metavar="SEC",
+        help="每次请求间隔秒数（默认 0.35）",
+    )
+
+    # ── hurst ─────────────────────────────────────────────────────
+    p_hurst = subs.add_parser(
+        "hurst",
+        help="计算 Hurst 指数特征并写回 features_cn",
+    )
+    p_hurst.add_argument(
+        "--windows", type=int, nargs="+", default=[24, 36], metavar="N",
+        help="滚动窗口列表（月数，默认 24 36）",
+    )
+    p_hurst.add_argument(
+        "--method", choices=["dfa", "rs"], default="dfa",
+        help="Hurst 算法：dfa（默认，月频推荐）或 rs（长序列适用）",
+    )
+    p_hurst.add_argument(
+        "--dry-run", action="store_true",
+        help="仅输出统计摘要，不写入数据库",
+    )
+
     return parser
 
 
@@ -815,7 +1040,15 @@ def main():
         log_file = getattr(args, "log_file", None),
     )
 
-    # 加载核心模块
+    # fetch-data / hurst 不需要重型 ML 依赖，走快速路径
+    if args.command in ("fetch-data", "hurst"):
+        from config import get_project_info, DATABASE_PATH
+        ctx = {"get_project_info": get_project_info}
+        cmd = {"fetch-data": cmd_fetch_data, "hurst": cmd_hurst}[args.command]
+        cmd(args, ctx)
+        return
+
+    # 加载核心模块（其他命令）
     if not getattr(args, "quiet", False):
         print("⏳ 加载依赖模块...")
     try:
@@ -841,6 +1074,8 @@ def main():
         "visualize":   cmd_visualize,
         "check":       cmd_check,
         "predict":     cmd_predict,
+        "fetch-data":  cmd_fetch_data,
+        "hurst":       cmd_hurst,
     }
     dispatch[args.command](args, ctx)
 
